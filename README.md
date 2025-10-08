@@ -1,6 +1,6 @@
 # ESP32 GPIO Bridge
 
-**Version:** 0.1.1-beta
+**Version:** 0.1.2-beta
 
 ## Overview
 
@@ -422,16 +422,27 @@ print(f"Pin {pin} supports analog: {caps.can_analog_read}")
 
 ```
 esp32-gpio-bridge/
-├── esp32_gpio_bridge/      # Main package
-│   ├── __init__.py        # Package exports
-│   ├── controller.py      # Core ESP32GPIO class
-│   ├── pins.py           # Pin management utilities
-│   └── config.py         # Configuration management
-├── examples/              # Example applications
-├── esp32_GPIO_bridge.ino  # ESP32 firmware
-├── setup.py              # Package installation
-├── requirements.txt      # Dependencies
-└── README.md             # This file
+├── .github/               # GitHub Actions workflows
+│   └── workflows/
+│       └── python-package-conda.yml
+├── esp32_gpio_bridge/     # Main Python package
+│   ├── __init__.py       # Package exports
+│   ├── controller.py     # Core ESP32GPIO class (570 lines)
+│   ├── pins.py          # Pin management utilities (225 lines)
+│   └── config.py        # Configuration management (277 lines)
+├── examples/             # Example applications
+│   ├── basic_io_example.py
+│   ├── sensor_hub_example.py
+│   └── README.md
+├── tests/               # Test suite
+│   ├── __init__.py
+│   └── test_pins.py     # Pin management tests (16 tests)
+├── esp32_GPIO_bridge.ino # ESP32 firmware
+├── environment.yml      # Conda environment configuration
+├── setup.py            # Package installation
+├── requirements.txt    # Python dependencies
+├── .gitignore         # Comprehensive ignore patterns
+└── README.md          # This file (483 lines)
 ```
 
 ### Contributing
@@ -450,11 +461,39 @@ pip install -e ".[dev]"
 # Run tests
 pytest
 
+# Run tests with coverage
+pytest --cov=esp32_gpio_bridge --cov-report=html
+
 # Type checking
 mypy esp32_gpio_bridge/
+
+# Lint code
+flake8 esp32_gpio_bridge/
 ```
 
+### Version Control
+
+The project includes a comprehensive `.gitignore` file that excludes:
+
+- **Python artifacts:** `__pycache__/`, `*.pyc`, virtual environments
+- **IDE files:** `.vscode/`, `.idea/`, `.spyderproject`
+- **OS files:** `.DS_Store`, `Thumbs.db`, desktop files
+- **ESP32 build files:** Arduino binaries, PlatformIO artifacts
+- **Testing artifacts:** Coverage reports, pytest cache
+- **Documentation builds:** Sphinx, MkDocs output
+- **CI/CD artifacts:** GitHub Actions cache, build artifacts
+
+This ensures a clean repository while preserving essential project files.
+
 ## Changelog
+
+### v0.1.2-beta
+- **Added:** Comprehensive .gitignore file for Python/ESP32 development
+- **Added:** GitHub Actions CI/CD pipeline with multi-Python testing
+- **Added:** Complete test suite with 16 comprehensive tests
+- **Improved:** Pin capability mapping accuracy for ESP32 hardware
+- **Enhanced:** Documentation with CI/CD and testing guidelines
+- **Fixed:** Touch sensor pin capability detection
 
 ### v0.1.1-beta
 - **Refactored:** Complete library restructuring with proper package organization

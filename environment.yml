@@ -1,0 +1,17 @@
+name: esp32-gpio-bridge
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python>=3.6
+  - pip
+  - pyserial>=3.5
+  # Development dependencies
+  - pytest>=6.0
+  - pytest-cov
+  - flake8
+  - black
+  - mypy
+  # Optional dependencies for enhanced functionality
+  - matplotlib
+  - numpy

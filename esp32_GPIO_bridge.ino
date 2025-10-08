@@ -3,7 +3,7 @@
 #include "driver/adc.h"
 #include "esp_adc_cal.h"
 
-#define FW_VERSION "0.1.1-beta"
+#define FW_VERSION "0.1.2-beta"
 #define BAUD_RATE 115200
 #define FAILSAFE_TIMEOUT 2000
 #define MAX_PINS 40

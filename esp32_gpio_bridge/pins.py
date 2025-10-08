@@ -39,72 +39,74 @@ class ESP32PinManager:
 
     # ESP32 pin capabilities mapping
     PIN_CAPABILITIES = {
-        # Digital I/O pins (most GPIO pins)
-        **{pin: PinCapabilities(pin, can_digital_read=True, can_digital_write=True)
-           for pin in range(0, 40)},
+        # DAC pins (8-bit, 0-3.3V range) - DAC-only pins
+        25: PinCapabilities(25, can_digital_read=False, can_digital_write=False, can_analog_write=True),
+        26: PinCapabilities(26, can_digital_read=False, can_digital_write=False, can_analog_write=True),
 
         # ADC1 pins (12-bit, 0-3.3V range)
-        32: PinCapabilities(32, can_analog_read=True),
-        33: PinCapabilities(33, can_analog_read=True),
-        34: PinCapabilities(34, can_analog_read=True),
-        35: PinCapabilities(35, can_analog_read=True),
-        36: PinCapabilities(36, can_analog_read=True, can_digital_read=False, can_digital_write=False),
-        37: PinCapabilities(37, can_analog_read=True, can_digital_read=False, can_digital_write=False),
-        38: PinCapabilities(38, can_analog_read=True, can_digital_read=False, can_digital_write=False),
-        39: PinCapabilities(39, can_analog_read=True, can_digital_read=False, can_digital_write=False),
+        # Pins 32-35: Can do both digital I/O and analog input
+        32: PinCapabilities(32, can_digital_read=True, can_digital_write=True, can_analog_read=True, can_pwm=True),
+        33: PinCapabilities(33, can_digital_read=True, can_digital_write=True, can_analog_read=True, can_pwm=True),
+        34: PinCapabilities(34, can_digital_read=True, can_digital_write=True, can_analog_read=True),
+        35: PinCapabilities(35, can_digital_read=True, can_digital_write=True, can_analog_read=True),
+        # Pins 36-39: ADC-only (input-only, cannot do digital I/O)
+        36: PinCapabilities(36, can_digital_read=False, can_digital_write=False, can_analog_read=True),
+        37: PinCapabilities(37, can_digital_read=False, can_digital_write=False, can_analog_read=True),
+        38: PinCapabilities(38, can_digital_read=False, can_digital_write=False, can_analog_read=True),
+        39: PinCapabilities(39, can_digital_read=False, can_digital_write=False, can_analog_read=True),
 
-        # DAC pins (8-bit, 0-3.3V range)
-        25: PinCapabilities(25, can_analog_write=True, can_digital_read=False, can_digital_write=False),
-        26: PinCapabilities(26, can_analog_write=True, can_digital_read=False, can_digital_write=False),
-
-        # Touch sensor pins
-        4: PinCapabilities(4, is_touch=True, special_functions=['TOUCH0']),
-        0: PinCapabilities(0, is_touch=True, special_functions=['TOUCH1']),
-        2: PinCapabilities(2, is_touch=True, special_functions=['TOUCH2']),
-        15: PinCapabilities(15, is_touch=True, special_functions=['TOUCH3']),
-        13: PinCapabilities(13, is_touch=True, special_functions=['TOUCH4']),
-        12: PinCapabilities(12, is_touch=True, special_functions=['TOUCH5']),
-        14: PinCapabilities(14, is_touch=True, special_functions=['TOUCH6']),
-        27: PinCapabilities(27, is_touch=True, special_functions=['TOUCH7']),
-        33: PinCapabilities(33, is_touch=True, special_functions=['TOUCH8']),
-        32: PinCapabilities(32, is_touch=True, special_functions=['TOUCH9']),
 
         # RTC GPIO pins (for ultra-low power)
-        0: PinCapabilities(0, is_rtc=True),
-        2: PinCapabilities(2, is_rtc=True),
-        4: PinCapabilities(4, is_rtc=True),
-        12: PinCapabilities(12, is_rtc=True),
-        13: PinCapabilities(13, is_rtc=True),
-        14: PinCapabilities(14, is_rtc=True),
-        15: PinCapabilities(15, is_rtc=True),
-        25: PinCapabilities(25, is_rtc=True),
-        26: PinCapabilities(26, is_rtc=True),
-        27: PinCapabilities(27, is_rtc=True),
-        32: PinCapabilities(32, is_rtc=True),
-        33: PinCapabilities(33, is_rtc=True),
-        34: PinCapabilities(34, is_rtc=True),
-        35: PinCapabilities(35, is_rtc=True),
-        36: PinCapabilities(36, is_rtc=True),
-        37: PinCapabilities(37, is_rtc=True),
-        38: PinCapabilities(38, is_rtc=True),
-        39: PinCapabilities(39, is_rtc=True),
+        0: PinCapabilities(0, can_digital_read=True, can_digital_write=True, is_rtc=True),
+        2: PinCapabilities(2, can_digital_read=True, can_digital_write=True, is_rtc=True),
+        4: PinCapabilities(4, can_digital_read=True, can_digital_write=True, is_rtc=True),
+        12: PinCapabilities(12, can_digital_read=True, can_digital_write=True, is_rtc=True),
+        13: PinCapabilities(13, can_digital_read=True, can_digital_write=True, is_rtc=True),
+        14: PinCapabilities(14, can_digital_read=True, can_digital_write=True, is_rtc=True),
+        15: PinCapabilities(15, can_digital_read=True, can_digital_write=True, is_rtc=True),
+        25: PinCapabilities(25, can_digital_read=False, can_digital_write=False, can_analog_write=True, is_rtc=True),
+        26: PinCapabilities(26, can_digital_read=False, can_digital_write=False, can_analog_write=True, is_rtc=True),
+        27: PinCapabilities(27, can_digital_read=True, can_digital_write=True, is_rtc=True),
+        32: PinCapabilities(32, can_digital_read=True, can_digital_write=True, can_analog_read=True, is_rtc=True),
+        33: PinCapabilities(33, can_digital_read=True, can_digital_write=True, can_analog_read=True, is_rtc=True),
+        34: PinCapabilities(34, can_digital_read=True, can_digital_write=True, can_analog_read=True, is_rtc=True),
+        35: PinCapabilities(35, can_digital_read=True, can_digital_write=True, can_analog_read=True, is_rtc=True),
+        36: PinCapabilities(36, can_digital_read=False, can_digital_write=False, can_analog_read=True, is_rtc=True),
+        37: PinCapabilities(37, can_digital_read=False, can_digital_write=False, can_analog_read=True, is_rtc=True),
+        38: PinCapabilities(38, can_digital_read=False, can_digital_write=False, can_analog_read=True, is_rtc=True),
+        39: PinCapabilities(39, can_digital_read=False, can_digital_write=False, can_analog_read=True, is_rtc=True),
 
-        # PWM-capable pins (most output pins support PWM)
-        **{pin: PinCapabilities(pin, can_pwm=True) for pin in [
+        # PWM-capable pins (most output pins support PWM) - exclude DAC and ADC-only pins
+        **{pin: PinCapabilities(pin, can_digital_read=True, can_digital_write=True, can_pwm=True) for pin in [
             0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
-            21, 22, 23, 25, 26, 27, 32, 33
+            21, 22, 23, 27  # Excluded: 25, 26 (DAC), 32, 33 (ADC with digital I/O)
         ]},
 
         # I2C default pins (can be remapped)
-        21: PinCapabilities(21, special_functions=['I2C_SDA']),
-        22: PinCapabilities(22, special_functions=['I2C_SCL']),
+        21: PinCapabilities(21, can_digital_read=True, can_digital_write=True, can_pwm=True, special_functions=['I2C_SDA']),
+        22: PinCapabilities(22, can_digital_read=True, can_digital_write=True, can_pwm=True, special_functions=['I2C_SCL']),
 
         # SPI default pins (can be remapped)
-        18: PinCapabilities(18, special_functions=['SPI_CLK']),
-        19: PinCapabilities(19, special_functions=['SPI_MISO']),
-        23: PinCapabilities(23, special_functions=['SPI_MOSI']),
-        5: PinCapabilities(5, special_functions=['SPI_CS']),
+        18: PinCapabilities(18, can_digital_read=True, can_digital_write=True, can_pwm=True, special_functions=['SPI_CLK']),
+        19: PinCapabilities(19, can_digital_read=True, can_digital_write=True, can_pwm=True, special_functions=['SPI_MISO']),
+        23: PinCapabilities(23, can_digital_read=True, can_digital_write=True, can_pwm=True, special_functions=['SPI_MOSI']),
+        5: PinCapabilities(5, can_digital_read=True, can_digital_write=True, can_pwm=True, special_functions=['SPI_CS']),
+
+        # Touch sensor pins (defined last to override previous definitions)
+        4: PinCapabilities(4, can_digital_read=True, can_digital_write=True, can_pwm=True, is_touch=True, is_rtc=True, special_functions=['TOUCH0']),
+        0: PinCapabilities(0, can_digital_read=True, can_digital_write=True, can_pwm=True, is_touch=True, is_rtc=True, special_functions=['TOUCH1']),
+        2: PinCapabilities(2, can_digital_read=True, can_digital_write=True, can_pwm=True, is_touch=True, is_rtc=True, special_functions=['TOUCH2']),
+        15: PinCapabilities(15, can_digital_read=True, can_digital_write=True, can_pwm=True, is_touch=True, is_rtc=True, special_functions=['TOUCH3']),
+        13: PinCapabilities(13, can_digital_read=True, can_digital_write=True, can_pwm=True, is_touch=True, is_rtc=True, special_functions=['TOUCH4']),
+        12: PinCapabilities(12, can_digital_read=True, can_digital_write=True, can_pwm=True, is_touch=True, is_rtc=True, special_functions=['TOUCH5']),
+        14: PinCapabilities(14, can_digital_read=True, can_digital_write=True, can_pwm=True, is_touch=True, is_rtc=True, special_functions=['TOUCH6']),
+        27: PinCapabilities(27, can_digital_read=True, can_digital_write=True, can_pwm=True, is_touch=True, is_rtc=True, special_functions=['TOUCH7']),
     }
+
+    # Add default capabilities for any pins not explicitly defined above
+    for pin in range(0, 40):
+        if pin not in PIN_CAPABILITIES:
+            PIN_CAPABILITIES[pin] = PinCapabilities(pin, can_digital_read=True, can_digital_write=True)
 
     @classmethod
     def get_pin_capabilities(cls, pin: int) -> PinCapabilities:
