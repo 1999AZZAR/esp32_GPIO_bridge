@@ -5,7 +5,7 @@ This module provides a comprehensive Python interface for controlling ESP32 GPIO
 analog I/O, I2C communication, I2S audio, PWM, and EEPROM from a host computer via USB serial connection.
 
 Author: ESP32 GPIO Bridge Project
-Version: 0.1.3-beta
+Version: 0.1.4-beta
 """
 
 import serial
@@ -222,7 +222,7 @@ class ESP32GPIO:
             self.ser.write(f"<{command}>".encode('utf-8'))
 
             if expect_response:
-                # Filter out PONG, STATUS, OK, and stale ERROR responses from queue
+                # Filter out PONG, STATUS, OK, ESP32 errors, and stale ERROR responses from queue
                 max_attempts = 20  # Increased for reliability
                 for attempt in range(max_attempts):
                     try:
@@ -236,6 +236,12 @@ class ESP32GPIO:
                         
                         # Skip OK responses from write commands (firmware sends these even though we don't expect them)
                         if response == "OK":
+                            continue
+                        
+                        # Skip ESP32 system error messages (e.g., "E (12345) gpio: error message")
+                        # These are debug messages from ESP32 core that leak into Serial
+                        if response.startswith("E (") and ")" in response:
+                            self.logger.debug(f"Skipping ESP32 system error: {response}")
                             continue
                         
                         # Skip STATUS responses unless we asked for STATUS

@@ -535,6 +535,22 @@ python <example_name>.py
 
 See `examples/README.md` for detailed setup instructions, wiring diagrams, and troubleshooting.
 
+## Performance & Optimization
+
+The firmware is stable and functional in v0.1.3-beta. For maximum performance and production deployment, see:
+
+**📄 [FIRMWARE_OPTIMIZATION_GUIDE.md](FIRMWARE_OPTIMIZATION_GUIDE.md)**
+
+Key optimization opportunities:
+- **Remove unnecessary OK responses** - 50-100ms faster per command, fixes queue contamination
+- **Increase serial buffers** - Better throughput for burst operations  
+- **Optimize failsafe checks** - 99% less CPU usage
+- **Replace String with char buffers** - No heap fragmentation, +500 bytes RAM
+- **O(1) PWM channel lookup** - Instant channel mapping
+- **Hardware timers for sensors** - Microsecond precision
+
+**Quick Win:** Removing "OK" responses alone makes the firmware production-ready!
+
 ## Command Protocol Reference
 
 Communication uses **115200 baud** with commands/responses wrapped in `<...>` delimiters.

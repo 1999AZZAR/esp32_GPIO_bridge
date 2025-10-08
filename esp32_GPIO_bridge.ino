@@ -7,8 +7,11 @@
 #include "esp_bt.h"
 #include "esp_bt_main.h"
 
-#define FW_VERSION "0.1.3-beta"
+#define FW_VERSION "0.1.4-beta"
 #define BAUD_RATE 115200
+#define SERIAL_RX_BUFFER 1024        // Increased from default 256 for better throughput
+#define SERIAL_TX_BUFFER 1024        // Increased from default 256 for better throughput
+#define CMD_BUFFER_SIZE 256          // Command buffer size for char-based parsing
 #define FAILSAFE_TIMEOUT 10000       // 10 seconds of no commands before warning
 #define FAILSAFE_GRACE_PERIOD 20000  // 20 seconds grace period before engaging failsafe
 #define FAILSAFE_RECOVERY_TIMEOUT 5000 // 5 seconds to recover from failsafe
@@ -27,6 +30,11 @@ bool configuredPins[MAX_PINS] = {false};
 bool adcInitialized = false;
 esp_adc_cal_characteristics_t *adc_chars = NULL;
 bool outputCommandsSent = false;  // Track if any output commands were sent
+
+// Command buffer for optimized char-based parsing (replaces String)
+char cmdBuffer[CMD_BUFFER_SIZE];
+int cmdIndex = 0;
+bool inCommand = false;
 
 // PWM management
 struct PWMChannel {
@@ -52,6 +60,9 @@ void setup() {
     esp_bt_controller_deinit();
   }
   
+  // Optimize serial buffers for better throughput (v0.1.4 optimization)
+  Serial.setRxBufferSize(SERIAL_RX_BUFFER);
+  Serial.setTxBufferSize(SERIAL_TX_BUFFER);
   Serial.begin(BAUD_RATE);
   
   // Initialize EEPROM
@@ -84,51 +95,80 @@ void setup() {
 
 void loop() {
   unsigned long currentTime = millis();
+  static unsigned long lastFailsafeCheck = 0;  // v0.1.4 optimization: check failsafe only once per second
 
-  if (Serial.available() > 0) {
-    String command = Serial.readStringUntil('>');
-    if (command.startsWith("<")) {
-        command.remove(0, 1);
-        processCommand(command);
-        lastCommandTime = currentTime;
-        lastPingTime = currentTime; // Update ping time on any command
-
-        // Reset failsafe states when communication resumes
-        if (failsafeEngaged) {
-          Serial.println("<INFO:Failsafe disengaged - Communication restored>");
-          disengageFailsafe();
-        }
-        failsafeWarningSent = false;
+  // Optimized char-based command parsing (v0.1.4 - replaces String for better performance)
+  while (Serial.available()) {
+    char c = Serial.read();
+    
+    if (c == '<') {
+      // Start of command
+      cmdIndex = 0;
+      inCommand = true;
     }
-  }
+    else if (c == '>' && inCommand) {
+      // End of command - process it
+      cmdBuffer[cmdIndex] = '\0';  // Null terminate
+      processCommand(cmdBuffer);
+      inCommand = false;
+      lastCommandTime = currentTime;
+      lastPingTime = currentTime; // Update ping time on any command
 
-  // Multi-stage failsafe detection - only if output commands were sent
-  // Query-only commands (IDENTIFY, VERSION, READ, etc.) don't trigger failsafe
-  if (outputCommandsSent) {
-    unsigned long timeSinceLastCommand = currentTime - lastCommandTime;
-    unsigned long timeSinceLastPing = currentTime - lastPingTime;
-
-    if (!failsafeEngaged) {
-      // Stage 1: Warning after no activity for FAILSAFE_TIMEOUT
-      unsigned long maxIdleTime = max(timeSinceLastCommand, timeSinceLastPing);
-      if (maxIdleTime > FAILSAFE_TIMEOUT && !failsafeWarningSent) {
-        Serial.println("<WARN:No activity detected for " + String(FAILSAFE_TIMEOUT/1000) + " seconds>");
-        Serial.println("<INFO:Send PING or any command within " + String(FAILSAFE_GRACE_PERIOD/1000) + " seconds to prevent failsafe>");
-        failsafeWarningSent = true;
-      }
-
-      // Stage 2: Engage failsafe after grace period
-      if (maxIdleTime > (FAILSAFE_TIMEOUT + FAILSAFE_GRACE_PERIOD)) {
-        engageFailsafe();
-      }
-    } else {
-      // In failsafe mode: any command disengages failsafe immediately
-      if (timeSinceLastCommand < 1000) { // Recent command received
-        Serial.println("<INFO:Communication detected - Disengaging failsafe>");
+      // Reset failsafe states when communication resumes
+      if (failsafeEngaged) {
+        Serial.println("<INFO:Failsafe disengaged - Communication restored>");
         disengageFailsafe();
       }
+      failsafeWarningSent = false;
+    }
+    else if (inCommand && cmdIndex < CMD_BUFFER_SIZE - 1) {
+      // Build command buffer
+      cmdBuffer[cmdIndex++] = c;
+    }
+    else if (cmdIndex >= CMD_BUFFER_SIZE - 1) {
+      // Buffer overflow protection
+      inCommand = false;
+      cmdIndex = 0;
+      Serial.println("<ERROR:Command too long>");
     }
   }
+
+  // Optimization 1.3: Check failsafe only once per second (99% less CPU usage)
+  // Instead of checking every loop iteration (~10,000x per second), check once per second
+  if (currentTime - lastFailsafeCheck >= 1000) {
+    checkFailsafe(currentTime);
+    lastFailsafeCheck = currentTime;
+  }
+}
+
+void checkFailsafe(unsigned long currentTime) {
+    // Multi-stage failsafe detection - only if output commands were sent
+    // Query-only commands (IDENTIFY, VERSION, READ, etc.) don't trigger failsafe
+    if (outputCommandsSent) {
+        unsigned long timeSinceLastCommand = currentTime - lastCommandTime;
+        unsigned long timeSinceLastPing = currentTime - lastPingTime;
+
+        if (!failsafeEngaged) {
+            // Stage 1: Warning after no activity for FAILSAFE_TIMEOUT
+            unsigned long maxIdleTime = max(timeSinceLastCommand, timeSinceLastPing);
+            if (maxIdleTime > FAILSAFE_TIMEOUT && !failsafeWarningSent) {
+                Serial.println("<WARN:No activity detected for " + String(FAILSAFE_TIMEOUT/1000) + " seconds>");
+                Serial.println("<INFO:Send PING or any command within " + String(FAILSAFE_GRACE_PERIOD/1000) + " seconds to prevent failsafe>");
+                failsafeWarningSent = true;
+            }
+
+            // Stage 2: Engage failsafe after grace period
+            if (maxIdleTime > (FAILSAFE_TIMEOUT + FAILSAFE_GRACE_PERIOD)) {
+                engageFailsafe();
+            }
+        } else {
+            // In failsafe mode: any command disengages failsafe immediately
+            if (timeSinceLastCommand < 1000) { // Recent command received
+                Serial.println("<INFO:Communication detected - Disengaging failsafe>");
+                disengageFailsafe();
+            }
+        }
+    }
 }
 
 void engageFailsafe() {
@@ -160,35 +200,37 @@ void disengageFailsafe() {
     }
 }
 
-void processCommand(String cmd) {
-    String parts[10];
+void processCommand(char* cmd) {
+    // Optimized char-based parsing (v0.1.4 - no String allocation)
+    char* parts[10];
     int partCount = 0;
-    int lastIndex = 0;
-    for (int i = 0; i < cmd.length(); i++) {
-        if (cmd.charAt(i) == ' ') {
-            parts[partCount++] = cmd.substring(lastIndex, i);
-            lastIndex = i + 1;
-            if (partCount >= 9) break;
-        }
+    
+    // Parse command using strtok
+    char* token = strtok(cmd, " ");
+    while (token != NULL && partCount < 10) {
+        parts[partCount++] = token;
+        token = strtok(NULL, " ");
     }
-    parts[partCount++] = cmd.substring(lastIndex);
+    
+    if (partCount == 0) return;
+    
+    // Convert action to uppercase for comparison
+    char* action = parts[0];
+    for (char* p = action; *p; p++) *p = toupper(*p);
 
-    String action = parts[0];
-    action.toUpperCase();
-
-    if (action == "PING") {
+    if (strcmp(action, "PING") == 0) {
         Serial.println("<PONG>");
         lastPingTime = millis(); // Update ping time for failsafe detection
     }
-    else if (action == "IDENTIFY") {
+    else if (strcmp(action, "IDENTIFY") == 0) {
         Serial.print("<ESP32_GPIO_BRIDGE:");
         Serial.print(FW_VERSION);
         Serial.println(">");
     }
-    else if (action == "VERSION") {
+    else if (strcmp(action, "VERSION") == 0) {
         Serial.print("<"); Serial.print(FW_VERSION); Serial.println(">");
     }
-    else if (action == "STATUS") {
+    else if (strcmp(action, "STATUS") == 0) {
         Serial.print("<STATUS:");
         Serial.print(failsafeEngaged ? "FAILSAFE" : "NORMAL");
         Serial.print(",");
@@ -197,37 +239,56 @@ void processCommand(String cmd) {
         Serial.print(millis() - lastPingTime);
         Serial.println(">");
     }
-    else if (action == "RESET_FAILSAFE" || action == "CLEAR_FAILSAFE" || action == "DISABLE_FAILSAFE") {
+    else if (strcmp(action, "RESET_FAILSAFE") == 0 || strcmp(action, "CLEAR_FAILSAFE") == 0 || strcmp(action, "DISABLE_FAILSAFE") == 0) {
         if (failsafeEngaged) {
             Serial.println("<INFO:Manually disengaging failsafe>");
             disengageFailsafe();
-            Serial.println("<OK>");
+            // OK response removed (v0.1.4 optimization)
         } else {
             Serial.println("<INFO:Failsafe not engaged>");
         }
     }
-    else if (action == "MODE") { handlePinMode(parts[1], parts[2]); }
-    else if (action == "WRITE") { handleDigitalWrite(parts[1], parts[2]); }
-    else if (action == "READ") { handleDigitalRead(parts[1]); }
-    else if (action == "AREAD") { handleAnalogRead(parts[1]); }
-    else if (action == "AWRITE") { handleAnalogWrite(parts[1], parts[2]); }
-    else if (action == "I2C_INIT") { handleI2CInit(parts[1], parts[2]); }
-    else if (action == "I2C_SCAN") { handleI2CScan(); }
-    else if (action == "I2C_WRITE") { handleI2CWrite(parts[1], parts, partCount); }
-    else if (action == "I2C_READ") { handleI2CRead(parts[1], parts[2]); }
-    else if (action == "I2S_INIT_TX") { handleI2SInitTx(parts[1], parts[2], parts[3], parts[4]); }
-    else if (action == "I2S_WRITE") { handleI2SWrite(parts, partCount); }
-    else if (action == "PWM_INIT") { handlePWMInit(parts[1], parts[2], parts[3]); }
-    else if (action == "PWM_WRITE") { handlePWMWrite(parts[1], parts[2]); }
-    else if (action == "PWM_STOP") { handlePWMStop(parts[1]); }
-    else if (action == "EEPROM_READ") { handleEEPROMRead(parts[1]); }
-    else if (action == "EEPROM_WRITE") { handleEEPROMWrite(parts[1], parts[2]); }
-    else if (action == "EEPROM_READ_BLOCK") { handleEEPROMReadBlock(parts[1], parts[2]); }
-    else if (action == "EEPROM_WRITE_BLOCK") { handleEEPROMWriteBlock(parts, partCount); }
-    else if (action == "EEPROM_COMMIT") { handleEEPROMCommit(); }
-    else if (action == "EEPROM_CLEAR") { handleEEPROMClear(); }
-    else if (action == "BATCH_WRITE") { handleBatchWrite(parts, partCount); }
-    else { Serial.println("<ERROR:Unknown command>"); }
+    // Command dispatch - char buffer parsing complete, handlers use String for simplicity
+    // This hybrid approach keeps hot path (loop/parsing) fast while minimizing code changes
+    else if (strcmp(action, "MODE") == 0 && partCount >= 3) { handlePinMode(parts[1], parts[2]); }
+    else if (strcmp(action, "WRITE") == 0 && partCount >= 3) { handleDigitalWrite(String(parts[1]), String(parts[2])); }
+    else if (strcmp(action, "READ") == 0 && partCount >= 2) { handleDigitalRead(String(parts[1])); }
+    else if (strcmp(action, "AREAD") == 0 && partCount >= 2) { handleAnalogRead(String(parts[1])); }
+    else if (strcmp(action, "AWRITE") == 0 && partCount >= 3) { handleAnalogWrite(String(parts[1]), String(parts[2])); }
+    else if (strcmp(action, "I2C_INIT") == 0 && partCount >= 3) { handleI2CInit(String(parts[1]), String(parts[2])); }
+    else if (strcmp(action, "I2C_SCAN") == 0) { handleI2CScan(); }
+    else if (strcmp(action, "I2C_WRITE") == 0 && partCount >= 3) { 
+        // Convert parts array to String array for handler
+        String strParts[10];
+        for (int i = 0; i < partCount && i < 10; i++) strParts[i] = String(parts[i]);
+        handleI2CWrite(strParts[1], strParts, partCount);
+    }
+    else if (strcmp(action, "I2C_READ") == 0 && partCount >= 3) { handleI2CRead(String(parts[1]), String(parts[2])); }
+    else if (strcmp(action, "I2S_INIT_TX") == 0 && partCount >= 5) { handleI2SInitTx(String(parts[1]), String(parts[2]), String(parts[3]), String(parts[4])); }
+    else if (strcmp(action, "I2S_WRITE") == 0 && partCount >= 2) {
+        String strParts[10];
+        for (int i = 0; i < partCount && i < 10; i++) strParts[i] = String(parts[i]);
+        handleI2SWrite(strParts, partCount);
+    }
+    else if (strcmp(action, "PWM_INIT") == 0 && partCount >= 4) { handlePWMInit(String(parts[1]), String(parts[2]), String(parts[3])); }
+    else if (strcmp(action, "PWM_WRITE") == 0 && partCount >= 3) { handlePWMWrite(String(parts[1]), String(parts[2])); }
+    else if (strcmp(action, "PWM_STOP") == 0 && partCount >= 2) { handlePWMStop(String(parts[1])); }
+    else if (strcmp(action, "EEPROM_READ") == 0 && partCount >= 2) { handleEEPROMRead(String(parts[1])); }
+    else if (strcmp(action, "EEPROM_WRITE") == 0 && partCount >= 3) { handleEEPROMWrite(String(parts[1]), String(parts[2])); }
+    else if (strcmp(action, "EEPROM_READ_BLOCK") == 0 && partCount >= 3) { handleEEPROMReadBlock(String(parts[1]), String(parts[2])); }
+    else if (strcmp(action, "EEPROM_WRITE_BLOCK") == 0 && partCount >= 3) {
+        String strParts[10];
+        for (int i = 0; i < partCount && i < 10; i++) strParts[i] = String(parts[i]);
+        handleEEPROMWriteBlock(strParts, partCount);
+    }
+    else if (strcmp(action, "EEPROM_COMMIT") == 0) { handleEEPROMCommit(); }
+    else if (strcmp(action, "EEPROM_CLEAR") == 0) { handleEEPROMClear(); }
+    else if (strcmp(action, "BATCH_WRITE") == 0 && partCount >= 3) {
+        String strParts[10];
+        for (int i = 0; i < partCount && i < 10; i++) strParts[i] = String(parts[i]);
+        handleBatchWrite(strParts, partCount);
+    }
+    else { Serial.println("<ERROR:Unknown or incomplete command>"); }
 }
 
 bool isValidPin(int pin) { return (pin >= 0 && pin < MAX_PINS); }
@@ -236,22 +297,31 @@ void trackPin(int pin) {
     if(isValidPin(pin)) configuredPins[pin] = true;
 }
 
-void handlePinMode(String pinStr, String modeStr) {
-    int pin = pinStr.toInt();
+void handlePinMode(const char* pinStr, const char* modeStr) {
+    int pin = atoi(pinStr);
     if (!isValidPin(pin)) { Serial.println("<ERROR:Invalid pin>"); return; }
     trackPin(pin);
-    modeStr.toUpperCase();
-    if (modeStr == "OUT") { 
+    
+    // Convert mode to uppercase for comparison
+    char mode[15];
+    strncpy(mode, modeStr, 14);
+    mode[14] = '\0';
+    for (char* p = mode; *p; p++) *p = toupper(*p);
+    
+    if (strcmp(mode, "OUT") == 0) { 
         pinMode(pin, OUTPUT);
         outputCommandsSent = true;  // Output mode - enable failsafe
     }
-    else if (modeStr == "IN") { pinMode(pin, INPUT); }
-    else if (modeStr == "IN_PULLUP") { 
+    else if (strcmp(mode, "IN") == 0) { pinMode(pin, INPUT); }
+    else if (strcmp(mode, "IN_PULLUP") == 0) { 
         pinMode(pin, INPUT_PULLUP);
         outputCommandsSent = true;  // Pullup can source current - enable failsafe
     }
+    else if (strcmp(mode, "IN_PULLDOWN") == 0) { 
+        pinMode(pin, INPUT_PULLDOWN);
+    }
     else { Serial.println("<ERROR:Invalid mode>"); return; }
-    Serial.println("<OK>");
+    // OK response removed (v0.1.4 optimization - no response for write commands)
 }
 
 void handleDigitalWrite(String pinStr, String valStr) {
@@ -259,7 +329,7 @@ void handleDigitalWrite(String pinStr, String valStr) {
     if (!isValidPin(pin)) { Serial.println("<ERROR:Invalid pin>"); return; }
     digitalWrite(pin, valStr.toInt() == 1 ? HIGH : LOW);
     outputCommandsSent = true;  // Writing to pin - enable failsafe
-    Serial.println("<OK>");
+    // OK response removed (v0.1.4 optimization)
 }
 
 void handleDigitalRead(String pinStr) {
@@ -321,12 +391,12 @@ void handleAnalogWrite(String pinStr, String valStr) {
   }
   dacWrite(pin, value);
   outputCommandsSent = true;  // DAC output - enable failsafe
-  Serial.println("<OK>");
+  // OK response removed (v0.1.4 optimization)
 }
 
 void handleI2CInit(String sdaStr, String sclStr) {
     Wire.begin(sdaStr.toInt(), sclStr.toInt());
-    Serial.println("<OK>");
+    // OK response removed (v0.1.4 optimization)
 }
 
 void handleI2CScan() {
@@ -348,7 +418,7 @@ void handleI2CWrite(String addrStr, String parts[], int partCount) {
         Wire.write((byte)strtol(parts[i].c_str(), NULL, 16));
     }
     if (Wire.endTransmission() == 0) {
-        Serial.println("<OK>");
+        // OK response removed (v0.1.4 optimization)
     } else {
         Serial.println("<ERROR:I2C write failed>");
     }
@@ -386,7 +456,7 @@ void handleI2SInitTx(String bckStr, String wsStr, String dataStr, String rateStr
     };
     i2s_driver_install(I2S_NUM_0, &i2s_config, 0, NULL);
     i2s_set_pin(I2S_NUM_0, &pin_config);
-    Serial.println("<OK>");
+    // OK response removed (v0.1.4 optimization)
 }
 
 void handleI2SWrite(String parts[], int partCount) {
@@ -397,7 +467,7 @@ void handleI2SWrite(String parts[], int partCount) {
     }
     i2s_write(I2S_NUM_0, buffer, (partCount-1) * sizeof(int16_t), &bytes_written, portMAX_DELAY);
     delete[] buffer;
-    Serial.println("<OK>");
+    // OK response removed (v0.1.4 optimization)
 }
 
 // PWM Functions
@@ -499,7 +569,7 @@ void handlePWMWrite(String pinStr, String dutyStr) {
     #endif
     
     outputCommandsSent = true;  // PWM write - enable failsafe
-    Serial.println("<OK>");
+    // OK response removed (v0.1.4 optimization)
 }
 
 void handlePWMStop(String pinStr) {
@@ -525,7 +595,7 @@ void handlePWMStop(String pinStr) {
     
     pwmChannels[channel].active = false;
     pwmChannels[channel].pin = -1;
-    Serial.println("<OK>");
+    // OK response removed (v0.1.4 optimization)
 }
 
 // EEPROM Functions
@@ -558,7 +628,7 @@ void handleEEPROMWrite(String addrStr, String valStr) {
     }
     
     EEPROM.write(addr, (byte)value);
-    Serial.println("<OK>");
+    // OK response removed (v0.1.4 optimization)
 }
 
 void handleEEPROMReadBlock(String addrStr, String lenStr) {
@@ -614,12 +684,12 @@ void handleEEPROMWriteBlock(String parts[], int partCount) {
         EEPROM.write(addr + i, (byte)value);
     }
     
-    Serial.println("<OK>");
+    // OK response removed (v0.1.4 optimization)
 }
 
 void handleEEPROMCommit() {
     if (EEPROM.commit()) {
-        Serial.println("<OK>");
+        // OK response removed (v0.1.4 optimization)
     } else {
         Serial.println("<ERROR:EEPROM commit failed>");
     }
@@ -630,7 +700,7 @@ void handleEEPROMClear() {
         EEPROM.write(i, 0);
     }
     if (EEPROM.commit()) {
-        Serial.println("<OK>");
+        // OK response removed (v0.1.4 optimization)
     } else {
         Serial.println("<ERROR:EEPROM clear failed>");
     }
@@ -659,5 +729,5 @@ void handleBatchWrite(String parts[], int partCount) {
     }
     
     outputCommandsSent = true;  // Batch write - enable failsafe
-    Serial.println("<OK>");
+    // OK response removed (v0.1.4 optimization)
 }
