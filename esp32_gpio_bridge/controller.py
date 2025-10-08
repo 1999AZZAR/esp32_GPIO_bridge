@@ -222,14 +222,20 @@ class ESP32GPIO:
             self.ser.write(f"<{command}>".encode('utf-8'))
 
             if expect_response:
-                # Filter out PONG, STATUS, and stale ERROR responses from queue
-                max_attempts = 10
+                # Filter out PONG, STATUS, OK, and stale ERROR responses from queue
+                max_attempts = 20  # Increased for reliability
                 for attempt in range(max_attempts):
                     try:
-                        response = self.get_response(timeout=0.5)
+                        # Longer timeout on first attempt, shorter on retries
+                        timeout = 1.5 if attempt < 3 else 0.3
+                        response = self.get_response(timeout=timeout)
                         
                         # Skip PONG responses from ping thread
                         if response == "PONG":
+                            continue
+                        
+                        # Skip OK responses from write commands (firmware sends these even though we don't expect them)
+                        if response == "OK":
                             continue
                         
                         # Skip STATUS responses unless we asked for STATUS
@@ -239,23 +245,21 @@ class ESP32GPIO:
                         # Skip stale ERROR messages that don't match current command
                         # (These are from previous write commands that we already handled)
                         if response.startswith("ERROR"):
-                            # If this is the first attempt, it might be a real error for this command
-                            if attempt == 0:
+                            # If this is within first few attempts, it might be a real error for this command
+                            if attempt < 5:
                                 raise ValueError(f"ESP32 Error: {response}")
                             # Otherwise it's likely stale, skip it
                             continue
                         
-                        # Return actual response
+                        # Return actual response (0, 1, version string, sensor value, etc.)
                         return response  # type: ignore[return-value]
                     except TimeoutError:
-                        # If we timeout, the command might not send a response
-                        if attempt == 0:
-                            raise
-                        # Otherwise keep trying to find valid response
+                        # Don't give up on first timeout - keep trying to find valid response
+                        # The queue might just be full of noise
                         continue
                 
-                # If we only got noise, raise error
-                raise TimeoutError("No valid response from ESP32 (only got PONG/STATUS/stale errors)")
+                # If we exhausted all attempts
+                raise TimeoutError(f"No valid response from ESP32 for command: {command}")
             return None
 
     def _send_pings(self) -> None:

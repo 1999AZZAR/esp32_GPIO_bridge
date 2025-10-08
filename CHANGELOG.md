@@ -64,11 +64,15 @@ All notable changes to the ESP32 GPIO Bridge project will be documented in this 
 - Added retry logic with PING commands (3 attempts) for robust connection
 - Connection now works reliably without user intervention
 - Proper handling of ESP32 bootloader messages
-- **Fixed response queue contamination** - Enhanced filtering system:
+- **Fixed response queue contamination** - Enhanced filtering system with improved timeout handling:
   - Filters out PONG responses from ping thread
+  - Filters out OK responses from write commands (firmware sends these even when not expected)
   - Filters out STATUS responses unless explicitly requested
   - Filters out stale ERROR messages from previous commands
-  - Up to 10 retry attempts to find valid responses
+  - Increased timeout to 1.5s for initial response (was 0.5s)
+  - Up to 20 retry attempts to find valid responses (was 10)
+  - No longer fails on first timeout - keeps trying to filter out noise
+  - Better error messages showing which command failed
   - Commands now correctly wait for actual responses, not background noise
 - Firmware version displays correctly (not "PONG" anymore)
 
