@@ -113,7 +113,7 @@ class ESP32Config:
         """
         self.config_path = config_path or self._get_default_config_path()
         self._config = self.DEFAULT_CONFIG.copy()
-        self._custom_presets = {}
+        self._custom_presets: Dict[str, Dict[str, Any]] = {}
 
         # Load custom configuration if it exists
         if os.path.exists(self.config_path):
@@ -153,7 +153,7 @@ class ESP32Config:
             Configuration dictionary
         """
         if section:
-            return self._config.get(section, {})
+            return self._config.get(section, {})  # type: ignore
         return self._config
 
     def update_config(self, section: str, key: str, value: Any) -> None:
@@ -166,8 +166,8 @@ class ESP32Config:
             value: New value
         """
         if section not in self._config:
-            self._config[section] = {}
-        self._config[section][key] = value
+            self._config[section] = {}  # type: ignore
+        self._config[section][key] = value  # type: ignore
         self.save_config()
 
     def get_preset(self, preset_name: str) -> Optional[Dict[str, Any]]:
@@ -204,11 +204,11 @@ class ESP32Config:
         Returns:
             Dictionary of preset names and descriptions
         """
-        presets = {}
+        presets: Dict[str, str] = {}
         for name, preset in self.COMMON_PRESETS.items():
-            presets[name] = preset.get('description', '')
+            presets[name] = preset.get('description', '')  # type: ignore
         for name, preset in self._custom_presets.items():
-            presets[name] = preset.get('description', '')
+            presets[name] = preset.get('description', '')  # type: ignore
         return presets
 
     def apply_preset(self, preset_name: str) -> Dict[str, Any]:
@@ -241,7 +241,7 @@ class ESP32Config:
         Returns:
             Pin configuration dictionary
         """
-        return self._config.get('pins', {}).get(pin_type, {})
+        return self._config.get('pins', {}).get(pin_type, {})  # type: ignore
 
     def set_pin_config(self, pin_type: str, **kwargs) -> None:
         """
@@ -252,11 +252,11 @@ class ESP32Config:
             **kwargs: Pin configuration parameters
         """
         if 'pins' not in self._config:
-            self._config['pins'] = {}
-        if pin_type not in self._config['pins']:
-            self._config['pins'][pin_type] = {}
+            self._config['pins'] = {}  # type: ignore
+        if pin_type not in self._config['pins']:  # type: ignore
+            self._config['pins'][pin_type] = {}  # type: ignore
 
-        self._config['pins'][pin_type].update(kwargs)
+        self._config['pins'][pin_type].update(kwargs)  # type: ignore
         self.save_config()
 
 

@@ -43,7 +43,7 @@ class ESP32GPIO:
         self.timeout = timeout
         self.ser: Optional[serial.Serial] = None
         self.lock = threading.Lock()
-        self.response_queue = Queue()
+        self.response_queue: Queue[str] = Queue()
         self._is_running = False
 
         # Configuration tracking
@@ -170,7 +170,7 @@ class ESP32GPIO:
                 response = self.get_response()
                 if response.startswith("ERROR"):
                     raise ValueError(f"ESP32 Error: {response}")
-                return response
+                return response  # type: ignore[return-value]
             return None
 
     def _send_pings(self) -> None:
@@ -185,6 +185,141 @@ class ESP32GPIO:
                 self._is_running = False
                 break
 
+    def __enter__(self) -> 'ESP32GPIO':
+        """Context manager entry."""
+        if not self.ser:
+            self.connect()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        """Context manager exit."""
+        self.close()
+
+    def close(self) -> None:
+        """Close connection to ESP32."""
+        if self._is_running:
+            self._is_running = False
+
+            # Wait for threads to finish
+            if hasattr(self, 'ping_thread') and self.ping_thread.is_alive():
+                self.ping_thread.join(timeout=1)
+            if hasattr(self, 'read_thread') and self.read_thread.is_alive():
+                self.read_thread.join(timeout=1)
+
+            # Close serial connection
+            if self.ser and self.ser.is_open:
+                self.ser.close()
+
+            self.logger.info("Connection closed.")
+
+    def get_version(self) -> str:
+        """
+        Get ESP32 firmware version.
+
+        Returns:
+            Firmware version string
+        """
+        return self._send_command("VERSION")  # type: ignore[return-value]
+
+    def set_pin_mode(self, pin: int, mode: str) -> None:
+        """
+        Set GPIO pin mode.
+
+        Args:
+            pin: GPIO pin number (0-39)
+            mode: Pin mode ('IN', 'OUT', or 'IN_PULLUP')
+
+        Raises:
+            ValueError: If pin or mode is invalid
+        """
+        if not 0 <= pin < 40:
+            raise ValueError(f"Invalid pin number: {pin}. Must be 0-39.")
+
+        mode = mode.upper()
+        if mode not in ['IN', 'OUT', 'IN_PULLUP']:
+            raise ValueError(f"Invalid mode: {mode}. Must be 'IN', 'OUT', or 'IN_PULLUP'.")
+
+        self._send_command(f"MODE {pin} {mode}")
+
+        # Track configured pins
+        if pin not in self.configured_pins:
+            self.configured_pins.append(pin)
+
+    def digital_write(self, pin: int, value: Union[int, bool]) -> None:
+        """
+        Write digital value to GPIO pin.
+
+        Args:
+            pin: GPIO pin number (0-39)
+            value: Digital value (0, 1, False, True)
+        """
+        if not 0 <= pin < 40:
+            raise ValueError(f"Invalid pin number: {pin}. Must be 0-39.")
+
+        int_value = 1 if value else 0
+        self._send_command(f"WRITE {pin} {int_value}")
+
+    def digital_read(self, pin: int) -> int:
+        """
+        Read digital value from GPIO pin.
+
+        Args:
+            pin: GPIO pin number (0-39)
+
+        Returns:
+            Digital value (0 or 1)
+        """
+        if not 0 <= pin < 40:
+            raise ValueError(f"Invalid pin number: {pin}. Must be 0-39.")
+
+        response = self._send_command(f"READ {pin}")
+        return int(response)  # type: ignore[arg-type]
+
+    def analog_read(self, pin: int) -> int:
+        """
+        Read analog value from ADC pin.
+
+        Args:
+            pin: ADC pin number (32-39)
+
+        Returns:
+            12-bit analog value (0-4095)
+
+        Raises:
+            ValueError: If pin is not a valid ADC pin
+        """
+        if pin not in [32, 33, 34, 35, 36, 37, 38, 39]:
+            raise ValueError(f"Invalid ADC pin: {pin}. Must be one of: 32, 33, 34, 35, 36, 37, 38, 39.")
+
+        response = self._send_command(f"AREAD {pin}")
+        return int(response)  # type: ignore[arg-type]
+
+    def analog_write(self, pin: int, value: int) -> None:
+        """
+        Write analog value to DAC pin.
+
+        Args:
+            pin: DAC pin number (25 or 26)
+            value: 8-bit analog value (0-255)
+
+        Raises:
+            ValueError: If pin or value is invalid
+        """
+        if pin not in [25, 26]:
+            raise ValueError(f"Invalid DAC pin: {pin}. Must be 25 or 26.")
+        if not 0 <= value <= 255:
+            raise ValueError(f"Invalid DAC value: {value}. Must be between 0 and 255.")
+
+        self._send_command(f"AWRITE {pin} {value}")
+
+    def get_configured_pins(self) -> List[int]:
+        """
+        Get list of currently configured GPIO pins.
+
+        Returns:
+            List of pin numbers that have been configured
+        """
+        return self.configured_pins.copy()
 
 
 def list_serial_ports() -> List[Tuple[str, str]]:
@@ -304,3 +439,5 @@ if __name__ == "__main__":
         print("\nExiting due to user interrupt.")
     except Exception as e:
         print(f"\nAn unexpected error occurred: {e}")
+
+

@@ -6,7 +6,7 @@ common pin mappings, and validation helpers.
 """
 
 from typing import Dict, List, Optional, Set, Tuple
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass
@@ -22,11 +22,7 @@ class PinCapabilities:
     is_rtc: bool = False
     has_pullup: bool = True
     has_pulldown: bool = True
-    special_functions: List[str] = None
-
-    def __post_init__(self):
-        if self.special_functions is None:
-            self.special_functions = []
+    special_functions: List[str] = field(default_factory=list)
 
 
 class ESP32PinManager:
