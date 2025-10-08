@@ -93,7 +93,7 @@ def main():
                             temperature = temp_raw / 100.0  # Simplified
                             pressure = press_raw / 256.0    # Simplified
 
-                            print(f"  Reading {i+1}: T={temperature".1f"}°C, P={pressure".1f"}hPa")
+                            print(f"  Reading {i+1}: T={temperature:.1f}°C, P={pressure:.1f}hPa")
 
                         time.sleep(1)
 
@@ -131,7 +131,7 @@ def main():
                             ay_g = ay / 16384.0
                             az_g = az / 16384.0
 
-                            print(f"  Reading {i+1}: Ax={ax_g".2f"}g, Ay={ay_g".2f"}g, Az={az_g".2f"}g")
+                            print(f"  Reading {i+1}: Ax={ax_g:.2f}g, Ay={ay_g:.2f}g, Az={az_g:.2f}g")
 
                         time.sleep(0.5)
 
@@ -139,8 +139,7 @@ def main():
                     print(f"MPU6050 example failed: {e}")
 
             # Generic I2C device communication example
-            print("
-Generic I2C Device Communication")
+            print("\nGeneric I2C Device Communication")
             print("-" * 40)
 
             for addr in devices[:2]:  # Test first 2 devices
@@ -157,7 +156,7 @@ Generic I2C Device Communication")
                             # Read 1 byte
                             data = esp.i2c_read(addr, 1)
                             if data:
-                                print(f"  Register 0x{reg"02X"}: 0x{data[0]"02X"}")
+                                print(f"  Register 0x{reg:02X}: 0x{data[0]:02X}")
                                 break
                         except:
                             continue

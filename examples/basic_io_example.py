@@ -83,8 +83,8 @@ def main():
                 # Convert to percentage
                 percentage = (raw_value / 4095.0) * 100
 
-                print(f"Reading {i+1"2d"}: Raw={raw_value"4d"}, "
-                      f"Voltage={voltage".2f"}V, Percentage={percentage"5.1f"}%")
+                print(f"Reading {i+1:2d}: Raw={raw_value:4d}, "
+                      f"Voltage={voltage:.2f}V, Percentage={percentage:5.1f}%")
 
                 time.sleep(0.5)
 
@@ -120,14 +120,14 @@ def main():
                 for value in range(0, 256, 25):
                     esp.analog_write(dac_pin, value)
                     voltage = (value / 255.0) * 3.3
-                    print(f"DAC value: {value"3d"}, Voltage: {voltage".2f"}V")
+                    print(f"DAC value: {value:3d}, Voltage: {voltage:.2f}V")
                     time.sleep(0.2)
 
                 # Fade back to 0
                 for value in range(255, -1, -25):
                     esp.analog_write(dac_pin, value)
                     voltage = (value / 255.0) * 3.3
-                    print(f"DAC value: {value"3d"}, Voltage: {voltage".2f"}V")
+                    print(f"DAC value: {value:3d}, Voltage: {voltage:.2f}V")
                     time.sleep(0.2)
 
             except Exception as e:

@@ -27,18 +27,62 @@ The system communicates over a simple, text-based serial protocol via USB connec
 - **I2S Audio Support:** Audio data transmission capabilities
 - **Pin Management:** Advanced pin capability detection and validation system
 - **Configuration Presets:** Pre-configured setups for common applications
-- **Failsafe Watchdog:** Automatic pin reset if communication is lost
+- **Enhanced Failsafe System:** Intelligent multi-stage failsafe with graceful recovery
 - **Context Manager Support:** Automatic resource cleanup with `with` statements
+
+## Enhanced Failsafe Mechanism
+
+The firmware includes an intelligent multi-stage failsafe system to prevent hardware from being left in an unsafe state while avoiding false triggers.
+
+### Failsafe Stages
+
+1. **Warning Stage** (after 2 seconds of inactivity):
+
+   - ESP32 sends warning messages about communication loss
+   - Provides 3-second grace period for recovery
+2. **Failsafe Engagement** (after 5 seconds total):
+
+   - All configured pins are reset to INPUT mode for safety
+   - Detailed logging of which pins were reset
+   - System enters protected state
+3. **Recovery Detection** (sustained communication):
+
+   - Monitors for sustained communication (5 seconds)
+   - Automatically disengages failsafe when stable connection detected
+
+### Failsafe Features
+
+- **Dual Monitoring**: Tracks both command activity and PING responses
+- **Graceful Recovery**: Requires sustained communication before disengaging failsafe
+- **Detailed Logging**: Provides comprehensive status information
+- **Pin Safety**: Automatically resets all configured pins to INPUT mode
+- **Status Query**: Use `STATUS` command to check current failsafe state
+
+### Example Failsafe Sequence
+
+```
+<WARN:No activity detected for 2 seconds>
+<INFO:Send PING or any command within 3 seconds to prevent failsafe>
+<WARN:Failsafe engaged - Communication lost>
+<INFO:All configured pins reset to INPUT mode for safety>
+<INFO:Reset pin 2 to INPUT>
+<INFO:Reset pin 34 to INPUT>
+<INFO:Failsafe active - Waiting for communication recovery>
+<INFO:Sustained communication detected - Disengaging failsafe>
+<INFO:Failsafe disengaged - Normal operation resumed>
+```
 
 ## Installation
 
 ### 1. ESP32 Firmware Setup
 
 **Prerequisites:**
+
 - ESP32 development board
 - Arduino IDE with ESP32 board manager (version 2.0.0 or higher recommended)
 
 **Flashing Instructions:**
+
 1. Open `esp32_GPIO_bridge.ino` in the Arduino IDE
 2. Connect ESP32 board via USB
 3. Select your ESP32 board model in Tools > Board
@@ -48,21 +92,25 @@ The system communicates over a simple, text-based serial protocol via USB connec
 ### 2. Python Library Installation
 
 **Prerequisites:**
+
 - Python 3.6 or higher
 
 **Install from source:**
+
 ```bash
-git clone <repository-url>
+git clone https://github.com/1999AZZAR/esp32_GPIO_bridge.git esp32-gpio-bridge
 cd esp32-gpio-bridge
 pip install -e .
 ```
 
 **Or install directly:**
+
 ```bash
 pip install esp32-gpio-bridge
 ```
 
 **Dependencies:**
+
 ```bash
 pip install pyserial
 ```
@@ -102,10 +150,21 @@ esp = ESP32GPIO(port, baudrate=115200, timeout=1.0)
 ```
 
 **Parameters:**
+
 - `port` (str): Serial port device path
 - `baudrate` (int): Communication speed (default: 115200)
 - `timeout` (float): Serial timeout in seconds (default: 1.0)
 - `auto_connect` (bool): Auto-connect on initialization (default: True)
+
+### Status Monitoring
+
+```python
+# Check ESP32 status including failsafe state
+status = esp.get_status()
+print(f"ESP32 State: {status['state']}")
+print(f"Failsafe engaged: {status['failsafe_engaged']}")
+print(f"Time since last command: {status['time_since_command']}ms")
+```
 
 ### Digital I/O Operations
 
@@ -297,6 +356,7 @@ cfg.add_custom_preset('my_sensors', {
 The `examples/` directory contains comprehensive examples:
 
 ### Basic I/O Example
+
 ```bash
 python examples/basic_io_example.py
 ```
@@ -304,6 +364,7 @@ python examples/basic_io_example.py
 Demonstrates digital I/O, analog I/O, and LED control.
 
 ### Sensor Hub Example
+
 ```bash
 python examples/sensor_hub_example.py
 ```
@@ -316,35 +377,39 @@ See `examples/README.md` for detailed setup instructions and troubleshooting.
 
 Communication uses **115200 baud** with commands/responses wrapped in `<...>` delimiters.
 
-| Command | Parameters | Description |
-|---------|------------|-------------|
-| `VERSION` | None | Returns firmware version |
-| `PING` | None | Watchdog keep-alive (returns `PONG`) |
-| `MODE <pin> <mode>` | pin: 0-39, mode: IN/OUT/IN_PULLUP | Set pin mode |
-| `WRITE <pin> <value>` | pin: 0-39, value: 0/1 | Digital write |
-| `READ <pin>` | pin: 0-39 | Digital read (returns 0/1) |
-| `AREAD <pin>` | pin: 32-39 | Analog read (returns 0-4095) |
-| `AWRITE <pin> <value>` | pin: 25/26, value: 0-255 | Analog write |
-| `I2C_INIT <sda> <scl>` | SDA/SCL pins | Initialize I2C bus |
-| `I2C_SCAN` | None | Scan for I2C devices |
-| `I2C_WRITE <addr> <data...>` | Hex address + data bytes | I2C write |
-| `I2C_READ <addr> <len>` | Hex address + length | I2C read |
-| `I2S_INIT_TX <bck> <ws> <data> <rate>` | Pin numbers + sample rate | Initialize I2S |
+| Command                                  | Parameters                        | Description                            |
+| ---------------------------------------- | --------------------------------- | -------------------------------------- |
+| `VERSION`                              | None                              | Returns firmware version               |
+| `PING`                                 | None                              | Watchdog keep-alive (returns `PONG`)   |
+| `STATUS`                               | None                              | Returns current system status          |
+| `MODE <pin> <mode>`                    | pin: 0-39, mode: IN/OUT/IN_PULLUP | Set pin mode                           |
+| `WRITE <pin> <value>`                  | pin: 0-39, value: 0/1             | Digital write                          |
+| `READ <pin>`                           | pin: 0-39                         | Digital read (returns 0/1)             |
+| `AREAD <pin>`                          | pin: 32-39                        | Analog read (returns 0-4095)           |
+| `AWRITE <pin> <value>`                 | pin: 25/26, value: 0-255          | Analog write                           |
+| `I2C_INIT <sda> <scl>`                 | SDA/SCL pins                      | Initialize I2C bus                     |
+| `I2C_SCAN`                             | None                              | Scan for I2C devices                   |
+| `I2C_WRITE <addr> <data...>`           | Hex address + data bytes          | I2C write                              |
+| `I2C_READ <addr> <len>`                | Hex address + length              | I2C read                               |
+| `I2S_INIT_TX <bck> <ws> <data> <rate>` | Pin numbers + sample rate         | Initialize I2S                         |
 
 ## Technical Specifications
 
 ### ADC Implementation
+
 - **Resolution:** 12-bit (0-4095)
 - **Voltage Range:** 0-3.3V (11dB attenuation)
 - **Calibration:** eFuse-based for improved accuracy
 - **Valid Pins:** GPIO 32-39 (ADC1 channels)
 
 ### DAC Implementation
+
 - **Resolution:** 8-bit (0-255)
 - **Voltage Range:** 0-3.3V
 - **Valid Pins:** GPIO 25 (DAC1), 26 (DAC2)
 
 ### I2C Specifications
+
 - **Default Pins:** SDA=21, SCL=22 (configurable)
 - **Speed:** Up to 400kHz (software limited)
 - **Device Support:** Standard I2C protocol
@@ -382,22 +447,23 @@ esp = ESP32GPIO(port)
 ### Common Issues
 
 1. **ESP32 not detected**
+
    - Verify USB connection and drivers
    - Check Arduino IDE port selection
    - Try resetting the ESP32 board
-
 2. **Permission denied (Linux/Mac)**
+
    ```bash
    sudo usermod -a -G dialout $USER
    # Logout and login again
    ```
-
 3. **No response from ESP32**
+
    - Confirm firmware is flashed correctly
    - Check serial port baud rate (115200)
    - Verify ESP32 is not in flash mode
-
 4. **ADC read errors**
+
    - Ensure pin is ADC-capable (32-39)
    - Check for pin conflicts with other peripherals
 
@@ -488,6 +554,7 @@ This ensures a clean repository while preserving essential project files.
 ## Changelog
 
 ### v0.1.2-beta
+
 - **Added:** Comprehensive .gitignore file for Python/ESP32 development
 - **Added:** GitHub Actions CI/CD pipeline with multi-Python testing
 - **Added:** Complete test suite with 16 comprehensive tests
@@ -496,6 +563,7 @@ This ensures a clean repository while preserving essential project files.
 - **Fixed:** Touch sensor pin capability detection
 
 ### v0.1.1-beta
+
 - **Refactored:** Complete library restructuring with proper package organization
 - **Added:** Advanced pin management system with capability detection
 - **Added:** Configuration management with presets for common applications
@@ -506,6 +574,7 @@ This ensures a clean repository while preserving essential project files.
 - **Fixed:** ADC driver implementation for ESP32 compatibility
 
 ### v0.1.0-beta
+
 - Initial release with basic GPIO, ADC, DAC, I2C, and I2S functionality
 - Failsafe watchdog implementation
 
@@ -516,6 +585,7 @@ MIT License - see LICENSE file for details.
 ## Support
 
 For issues, questions, or contributions:
+
 - Check existing documentation and examples
 - Review troubleshooting section
 - Open an issue on the project repository

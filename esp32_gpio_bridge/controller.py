@@ -13,7 +13,7 @@ import serial.tools.list_ports
 import time
 import threading
 from queue import Queue, Empty
-from typing import List, Tuple, Optional, Union
+from typing import List, Tuple, Optional, Union, Dict, Any
 import logging
 
 
@@ -77,6 +77,9 @@ class ESP32GPIO:
             # Start ping thread for failsafe
             self.ping_thread = threading.Thread(target=self._send_pings, daemon=True)
             self.ping_thread.start()
+
+            # Initialize failsafe state tracking
+            self.failsafe_engaged = False
 
             self.logger.info(f"Connected to ESP32 GPIO Bridge on {self.port}")
 
@@ -220,6 +223,30 @@ class ESP32GPIO:
             Firmware version string
         """
         return self._send_command("VERSION")  # type: ignore[return-value]
+
+    def get_status(self) -> Dict[str, Any]:
+        """
+        Get ESP32 status including failsafe state.
+
+        Returns:
+            Dictionary containing status information
+        """
+        try:
+            response = self._send_command("STATUS")
+            if response and "," in response:
+                parts = response.split(",")
+                if len(parts) >= 3:
+                    status_info = {
+                        'state': parts[0],
+                        'time_since_command': int(parts[1]),
+                        'time_since_ping': int(parts[2]),
+                        'failsafe_engaged': parts[0] == "FAILSAFE"
+                    }
+                    self.failsafe_engaged = bool(status_info['failsafe_engaged'])
+                    return status_info
+        except (ValueError, IOError):
+            pass
+        return {'state': 'UNKNOWN', 'failsafe_engaged': self.failsafe_engaged}
 
     def set_pin_mode(self, pin: int, mode: str) -> None:
         """
@@ -412,6 +439,11 @@ if __name__ == "__main__":
         with ESP32GPIO(esp32_port) as esp:
             print(f"Firmware Version: {esp.get_version()}")
 
+            # Demo: Check ESP32 status
+            status = esp.get_status()
+            print(f"ESP32 Status: {status['state']}")
+            print(f"Failsafe engaged: {status['failsafe_engaged']}")
+
             # Demo: Blink LED on GPIO 2
             led_pin = 2
             print(f"\nBlinking LED on GPIO {led_pin}...")
@@ -432,6 +464,11 @@ if __name__ == "__main__":
                 time.sleep(0.5)
 
             print(f"\nConfigured pins: {esp.get_configured_pins()}")
+
+            # Demo: Final status check
+            final_status = esp.get_status()
+            print(f"\nFinal ESP32 Status: {final_status['state']}")
+            print(f"Total session time: {final_status['time_since_command']}ms since last command")
 
     except serial.SerialException as e:
         print(f"Error: Could not open port {esp32_port}. {e}")

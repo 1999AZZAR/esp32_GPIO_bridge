@@ -5,12 +5,16 @@
 
 #define FW_VERSION "0.1.2-beta"
 #define BAUD_RATE 115200
-#define FAILSAFE_TIMEOUT 2000
+#define FAILSAFE_TIMEOUT 2000        // 2 seconds of no commands before warning
+#define FAILSAFE_GRACE_PERIOD 3000   // 3 seconds grace period before engaging failsafe
+#define FAILSAFE_RECOVERY_TIMEOUT 5000 // 5 seconds to recover from failsafe
 #define MAX_PINS 40
 #define DEFAULT_VREF 1100
 
 unsigned long lastCommandTime = 0;
+unsigned long lastPingTime = 0;
 bool failsafeEngaged = false;
+bool failsafeWarningSent = false;
 bool configuredPins[MAX_PINS] = {false};
 bool adcInitialized = false;
 esp_adc_cal_characteristics_t *adc_chars = NULL;
@@ -31,36 +35,85 @@ void setup() {
   Serial.println(">");
   
   lastCommandTime = millis();
+  lastPingTime = millis();
 }
 
 void loop() {
+  unsigned long currentTime = millis();
+
   if (Serial.available() > 0) {
     String command = Serial.readStringUntil('>');
     if (command.startsWith("<")) {
         command.remove(0, 1);
         processCommand(command);
-        lastCommandTime = millis();
+        lastCommandTime = currentTime;
+        lastPingTime = currentTime; // Update ping time on any command
+
+        // Reset failsafe states when communication resumes
         if (failsafeEngaged) {
-          Serial.println("<INFO:Failsafe disengaged>");
-          failsafeEngaged = false;
+          Serial.println("<INFO:Failsafe disengaged - Communication restored>");
+          disengageFailsafe();
         }
+        failsafeWarningSent = false;
     }
   }
 
-  if (!failsafeEngaged && (millis() - lastCommandTime > FAILSAFE_TIMEOUT)) {
-    engageFailsafe();
+  // Multi-stage failsafe detection using both command and ping times
+  unsigned long timeSinceLastCommand = currentTime - lastCommandTime;
+  unsigned long timeSinceLastPing = currentTime - lastPingTime;
+
+  if (!failsafeEngaged) {
+    // Stage 1: Warning after no activity for FAILSAFE_TIMEOUT
+    unsigned long maxIdleTime = max(timeSinceLastCommand, timeSinceLastPing);
+    if (maxIdleTime > FAILSAFE_TIMEOUT && !failsafeWarningSent) {
+      Serial.println("<WARN:No activity detected for " + String(FAILSAFE_TIMEOUT/1000) + " seconds>");
+      Serial.println("<INFO:Send PING or any command within " + String(FAILSAFE_GRACE_PERIOD/1000) + " seconds to prevent failsafe>");
+      failsafeWarningSent = true;
+    }
+
+    // Stage 2: Engage failsafe after grace period
+    if (maxIdleTime > (FAILSAFE_TIMEOUT + FAILSAFE_GRACE_PERIOD)) {
+      engageFailsafe();
+    }
+  } else {
+    // In failsafe mode: check for sustained recovery
+    if (timeSinceLastCommand < FAILSAFE_RECOVERY_TIMEOUT && timeSinceLastPing < FAILSAFE_RECOVERY_TIMEOUT) {
+      // Sustained communication for recovery period - disengage failsafe
+      Serial.println("<INFO:Sustained communication detected - Disengaging failsafe>");
+      disengageFailsafe();
+    } else if (timeSinceLastCommand < 1000) { // Recent command but not sustained
+      Serial.println("<INFO:Recent communication detected - Monitoring for sustained recovery>");
+    }
   }
 }
 
 void engageFailsafe() {
-    Serial.println("<WARN:Failsafe engaged. Resetting pins.>");
+    Serial.println("<WARN:Failsafe engaged - Communication lost>");
+    Serial.println("<INFO:All configured pins reset to INPUT mode for safety>");
+
+    // Reset all configured pins to INPUT mode
     for (int i = 0; i < MAX_PINS; i++) {
         if (configuredPins[i]) {
             pinMode(i, INPUT);
             configuredPins[i] = false;
+            Serial.println("<INFO:Reset pin " + String(i) + " to INPUT>");
         }
     }
+
     failsafeEngaged = true;
+    failsafeWarningSent = false; // Reset warning state
+
+    Serial.println("<INFO:Failsafe active - Waiting for communication recovery>");
+}
+
+void disengageFailsafe() {
+    if (failsafeEngaged) {
+        Serial.println("<INFO:Failsafe disengaged - Normal operation resumed>");
+        failsafeEngaged = false;
+        failsafeWarningSent = false;
+        // Note: Pins remain in their last configured state
+        // User must reconfigure pins as needed
+    }
 }
 
 void processCommand(String cmd) {
@@ -79,8 +132,22 @@ void processCommand(String cmd) {
     String action = parts[0];
     action.toUpperCase();
 
-    if (action == "PING") { Serial.println("<PONG>"); }
-    else if (action == "VERSION") { Serial.print("<"); Serial.print(FW_VERSION); Serial.println(">"); }
+    if (action == "PING") {
+        Serial.println("<PONG>");
+        lastPingTime = millis(); // Update ping time for failsafe detection
+    }
+    else if (action == "VERSION") {
+        Serial.print("<"); Serial.print(FW_VERSION); Serial.println(">");
+    }
+    else if (action == "STATUS") {
+        Serial.print("<STATUS:");
+        Serial.print(failsafeEngaged ? "FAILSAFE" : "NORMAL");
+        Serial.print(",");
+        Serial.print(millis() - lastCommandTime);
+        Serial.print(",");
+        Serial.print(millis() - lastPingTime);
+        Serial.println(">");
+    }
     else if (action == "MODE") { handlePinMode(parts[1], parts[2]); }
     else if (action == "WRITE") { handleDigitalWrite(parts[1], parts[2]); }
     else if (action == "READ") { handleDigitalRead(parts[1]); }
