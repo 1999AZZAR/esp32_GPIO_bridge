@@ -1,12 +1,14 @@
 # ESP32 GPIO Bridge
 
-**Version:** 0.1.2-beta
+**Version:** 0.1.3-beta
 
 ## Overview
 
 ESP32 GPIO Bridge transforms an ESP32 development board into a versatile, PC-controlled hardware interface. It allows a host computer running Python to directly control and communicate with hardware components like sensors, actuators, and other ICs. This setup combines the processing power and rich software environment of a PC with the real-world interfacing capabilities of a microcontroller.
 
-The system communicates over a simple, text-based serial protocol via USB connection, providing a comprehensive Python library for GPIO control, I2C communication, and sensor integration.
+The system communicates over a simple, text-based serial protocol via USB connection, providing a comprehensive Python library for GPIO control, PWM, I2C communication, EEPROM storage, and sensor integration.
+
+**New in v0.1.3-beta:** WiFi and Bluetooth are now disabled by default to maximize GPIO performance and free up resources for extensive peripheral usage.
 
 ### System Architecture
 
@@ -21,26 +23,32 @@ The system communicates over a simple, text-based serial protocol via USB connec
 ## Features
 
 - **Digital GPIO Control:** Set pin modes, read/write digital states with comprehensive pin management
+- **PWM Control:** Hardware PWM on up to 16 channels with configurable frequency and resolution
 - **Analog Input (ADC):** 12-bit analog readings (0-4095) from ADC-capable pins with calibration support
 - **Analog Output (DAC):** 8-bit analog voltage output on dedicated DAC pins (GPIO 25 & 26)
+- **EEPROM Storage:** 512 bytes of persistent storage for configuration and data
 - **I2C Communication:** Full I2C bus control with device scanning and data transfer
 - **I2S Audio Support:** Audio data transmission capabilities
+- **Batch Operations:** Efficient multi-pin control in a single command
 - **Pin Management:** Advanced pin capability detection and validation system
 - **Configuration Presets:** Pre-configured setups for common applications
 - **Enhanced Failsafe System:** Intelligent multi-stage failsafe with instant recovery and manual control
 - **Context Manager Support:** Automatic resource cleanup with `with` statements
+- **Optimized Performance:** WiFi and Bluetooth disabled for maximum GPIO resource availability
 
 ## Enhanced Failsafe Mechanism
 
 The firmware includes an intelligent multi-stage failsafe system to prevent hardware from being left in an unsafe state while avoiding false triggers.
 
+**Important:** Failsafe **only activates** if output commands are sent (MODE with OUT/IN_PULLUP, WRITE, PWM, DAC, etc.). Query commands (IDENTIFY, VERSION, READ, EEPROM) don't trigger failsafe, allowing auto-detection and monitoring without requiring ESP32 reset.
+
 ### Failsafe Stages
 
-1. **Warning Stage** (after 2 seconds of inactivity):
+1. **Warning Stage** (after 10 seconds of inactivity):
 
    - ESP32 sends warning messages about communication loss
-   - Provides 3-second grace period for recovery
-2. **Failsafe Engagement** (after 5 seconds total):
+   - Provides 20-second grace period for recovery
+2. **Failsafe Engagement** (after 30 seconds total):
 
    - All configured pins are reset to INPUT mode for safety
    - Detailed logging of which pins were reset
@@ -52,7 +60,10 @@ The firmware includes an intelligent multi-stage failsafe system to prevent hard
 
 ### Failsafe Features
 
+- **Smart Activation**: Only activates after output commands (MODE OUT, WRITE, PWM, etc.)
+- **Query-Safe**: IDENTIFY, VERSION, READ, STATUS, EEPROM commands don't trigger failsafe
 - **Dual Monitoring**: Tracks both command activity and PING responses
+- **Generous Timeout**: 30 seconds total (10s warning + 20s grace) for development convenience
 - **Instant Recovery**: Any command immediately disengages failsafe (no waiting period)
 - **Manual Control**: Commands like `RESET_FAILSAFE` provide manual control
 - **Detailed Logging**: Provides comprehensive status information
@@ -62,8 +73,9 @@ The firmware includes an intelligent multi-stage failsafe system to prevent hard
 ### Example Failsafe Sequence
 
 ```
-<WARN:No activity detected for 2 seconds>
-<INFO:Send PING or any command within 3 seconds to prevent failsafe>
+# After using output commands (MODE OUT, WRITE, etc.):
+<WARN:No activity detected for 10 seconds>
+<INFO:Send PING or any command within 20 seconds to prevent failsafe>
 <WARN:Failsafe engaged - Communication lost>
 <INFO:All configured pins reset to INPUT mode for safety>
 <INFO:Reset pin 2 to INPUT>
@@ -71,6 +83,8 @@ The firmware includes an intelligent multi-stage failsafe system to prevent hard
 <INFO:Failsafe active - Send any command to disengage>
 <INFO:Communication detected - Disengaging failsafe>
 <INFO:Failsafe disengaged - Normal operation resumed>
+
+# Note: Query commands (IDENTIFY, VERSION, READ) don't trigger failsafe at all
 ```
 
 ### Manual Failsafe Control
@@ -97,7 +111,8 @@ print(f"Failsafe reset: {success}")
 **Prerequisites:**
 
 - ESP32 development board
-- Arduino IDE with ESP32 board manager (version 2.0.0 or higher recommended)
+- Arduino IDE with ESP32 board manager (version 2.0.0 or higher)
+  - Compatible with ESP32 Arduino core 2.x and 3.x
 
 **Flashing Instructions:**
 
@@ -230,6 +245,64 @@ esp.analog_write(pin, value)
 # Valid pins: 25, 26 (DAC1, DAC2)
 ```
 
+### PWM Operations
+
+```python
+# Initialize PWM
+channel = esp.pwm_init(pin, frequency=5000, resolution=8)
+# frequency: 1-40000 Hz (default: 5000)
+# resolution: 1-16 bits (default: 8)
+
+# Set duty cycle (raw value)
+esp.pwm_write(pin, 128)  # 50% duty cycle for 8-bit resolution
+
+# Set duty cycle (percentage)
+esp.pwm_set_duty_percent(pin, 50.0)  # 50% duty cycle
+
+# Stop PWM and release channel
+esp.pwm_stop(pin)
+```
+
+### EEPROM Operations
+
+```python
+# Read single byte
+value = esp.eeprom_read(address)  # address: 0-511
+
+# Write single byte (requires commit)
+esp.eeprom_write(address, value)  # value: 0-255
+esp.eeprom_commit()  # Save changes to flash
+
+# Read block of data
+data = esp.eeprom_read_block(address, length)
+# Returns: List of integers
+
+# Write block of data
+esp.eeprom_write_block(address, [10, 20, 30, 40])
+esp.eeprom_commit()
+
+# String operations
+esp.eeprom_write_string(100, "Hello ESP32!")
+esp.eeprom_commit()
+text = esp.eeprom_read_string(100, 12)
+
+# Clear all EEPROM
+esp.eeprom_clear()  # Sets all bytes to 0 and commits
+```
+
+### Batch Operations
+
+```python
+# Set multiple pins efficiently in one command
+esp.batch_digital_write({
+    2: 1,   # Pin 2 HIGH
+    4: 0,   # Pin 4 LOW
+    5: 1,   # Pin 5 HIGH
+    12: 0   # Pin 12 LOW
+})
+# Much faster than individual digital_write() calls
+```
+
 ### I2C Communication
 
 ```python
@@ -306,19 +379,31 @@ esp.close()  # Manual cleanup
 
 ### Auto-Detection
 
+The library now includes **robust auto-detection** that actively probes serial ports:
+
 ```python
 from esp32_gpio_bridge import find_esp32_port, list_serial_ports
 
-# Auto-detect ESP32
+# Auto-detect ESP32 (actively probes ports)
 port = find_esp32_port()
 if port:
     print(f"Found ESP32 on: {port}")
+else:
+    print("ESP32 not found")
 
 # List all available ports
 ports = list_serial_ports()
 for device, description in ports:
     print(f"{device}: {description}")
 ```
+
+The auto-detection:
+- **Disables DTR/RTS** to prevent unwanted ESP32 resets
+- **Drains boot messages** (0.5s buffer clear) for clean communication
+- **Sends PING/IDENTIFY** commands with 3 retries per port
+- **Checks ESP32 GPIO Bridge signature** in responses
+- **No manual reset needed** - works automatically!
+- Reliable (2s timeout per port with intelligent retry logic)
 
 ### Manual Port Selection
 
@@ -400,6 +485,14 @@ python examples/sensor_hub_example.py
 
 Shows I2C sensor integration and multi-device communication.
 
+### Advanced Features Example (NEW in v0.1.3-beta)
+
+```bash
+python examples/advanced_features_example.py
+```
+
+Demonstrates PWM control, EEPROM storage, batch operations, and motor control.
+
 See `examples/README.md` for detailed setup instructions and troubleshooting.
 
 ## Command Protocol Reference
@@ -408,6 +501,7 @@ Communication uses **115200 baud** with commands/responses wrapped in `<...>` de
 
 | Command                                  | Parameters                        | Description                            |
 | ---------------------------------------- | --------------------------------- | -------------------------------------- |
+| `IDENTIFY`                             | None                              | Returns device signature (for auto-detect) |
 | `VERSION`                              | None                              | Returns firmware version               |
 | `PING`                                 | None                              | Watchdog keep-alive (returns `PONG`)   |
 | `STATUS`                               | None                              | Returns current system status          |
@@ -419,6 +513,16 @@ Communication uses **115200 baud** with commands/responses wrapped in `<...>` de
 | `READ <pin>`                           | pin: 0-39                         | Digital read (returns 0/1)             |
 | `AREAD <pin>`                          | pin: 32-39                        | Analog read (returns 0-4095)           |
 | `AWRITE <pin> <value>`                 | pin: 25/26, value: 0-255          | Analog write                           |
+| `PWM_INIT <pin> <freq> <res>`          | pin, frequency (Hz), resolution   | Initialize PWM (returns channel)       |
+| `PWM_WRITE <pin> <duty>`               | pin, duty cycle value             | Set PWM duty cycle                     |
+| `PWM_STOP <pin>`                       | pin                               | Stop PWM and release channel           |
+| `EEPROM_READ <addr>`                   | address: 0-511                    | Read byte from EEPROM                  |
+| `EEPROM_WRITE <addr> <val>`            | address, value: 0-255             | Write byte to EEPROM                   |
+| `EEPROM_READ_BLOCK <addr> <len>`       | address, length                   | Read block from EEPROM                 |
+| `EEPROM_WRITE_BLOCK <addr> <data...>`  | address, byte values              | Write block to EEPROM                  |
+| `EEPROM_COMMIT`                        | None                              | Commit EEPROM changes to flash         |
+| `EEPROM_CLEAR`                         | None                              | Clear all EEPROM and commit            |
+| `BATCH_WRITE <pin1> <val1> ...`        | pin/value pairs                   | Write multiple pins at once            |
 | `I2C_INIT <sda> <scl>`                 | SDA/SCL pins                      | Initialize I2C bus                     |
 | `I2C_SCAN`                             | None                              | Scan for I2C devices                   |
 | `I2C_WRITE <addr> <data...>`           | Hex address + data bytes          | I2C write                              |
@@ -585,30 +689,7 @@ This ensures a clean repository while preserving essential project files.
 
 ## Changelog
 
-### v0.1.2-beta
-
-- **Added:** Comprehensive .gitignore file for Python/ESP32 development
-- **Added:** GitHub Actions CI/CD pipeline with multi-Python testing
-- **Added:** Complete test suite with 16 comprehensive tests
-- **Improved:** Pin capability mapping accuracy for ESP32 hardware
-- **Enhanced:** Documentation with CI/CD and testing guidelines
-- **Fixed:** Touch sensor pin capability detection
-
-### v0.1.1-beta
-
-- **Refactored:** Complete library restructuring with proper package organization
-- **Added:** Advanced pin management system with capability detection
-- **Added:** Configuration management with presets for common applications
-- **Added:** Context manager support for automatic resource cleanup
-- **Added:** Comprehensive error handling and validation
-- **Added:** Type hints throughout the codebase
-- **Improved:** Documentation with examples and troubleshooting guides
-- **Fixed:** ADC driver implementation for ESP32 compatibility
-
-### v0.1.0-beta
-
-- Initial release with basic GPIO, ADC, DAC, I2C, and I2S functionality
-- Failsafe watchdog implementation
+See [CHANGELOG.md](CHANGELOG.md) for detailed version history.
 
 ## License
 

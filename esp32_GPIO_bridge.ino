@@ -1,15 +1,23 @@
 #include <Wire.h>
+#include <EEPROM.h>
 #include "driver/i2s.h"
 #include "driver/adc.h"
 #include "esp_adc_cal.h"
+#include "esp_wifi.h"
+#include "esp_bt.h"
+#include "esp_bt_main.h"
 
-#define FW_VERSION "0.1.2-beta"
+#define FW_VERSION "0.1.3-beta"
 #define BAUD_RATE 115200
-#define FAILSAFE_TIMEOUT 2000        // 2 seconds of no commands before warning
-#define FAILSAFE_GRACE_PERIOD 3000   // 3 seconds grace period before engaging failsafe
+#define FAILSAFE_TIMEOUT 10000       // 10 seconds of no commands before warning
+#define FAILSAFE_GRACE_PERIOD 20000  // 20 seconds grace period before engaging failsafe
 #define FAILSAFE_RECOVERY_TIMEOUT 5000 // 5 seconds to recover from failsafe
 #define MAX_PINS 40
 #define DEFAULT_VREF 1100
+#define EEPROM_SIZE 512              // 512 bytes of EEPROM
+#define MAX_PWM_CHANNELS 16
+#define PWM_FREQUENCY 5000
+#define PWM_RESOLUTION 8
 
 unsigned long lastCommandTime = 0;
 unsigned long lastPingTime = 0;
@@ -18,9 +26,43 @@ bool failsafeWarningSent = false;
 bool configuredPins[MAX_PINS] = {false};
 bool adcInitialized = false;
 esp_adc_cal_characteristics_t *adc_chars = NULL;
+bool outputCommandsSent = false;  // Track if any output commands were sent
+
+// PWM management
+struct PWMChannel {
+  int pin;
+  int channel;
+  bool active;
+};
+PWMChannel pwmChannels[MAX_PWM_CHANNELS];
+int nextPWMChannel = 0;
 
 void setup() {
+  // Disable WiFi to save power and resources
+  esp_wifi_stop();
+  esp_wifi_deinit();
+  
+  // Disable Bluetooth to save power and resources
+  if (esp_bluedroid_get_status() == ESP_BLUEDROID_STATUS_ENABLED) {
+    esp_bluedroid_disable();
+    esp_bluedroid_deinit();
+  }
+  if (esp_bt_controller_get_status() == ESP_BT_CONTROLLER_STATUS_ENABLED) {
+    esp_bt_controller_disable();
+    esp_bt_controller_deinit();
+  }
+  
   Serial.begin(BAUD_RATE);
+  
+  // Initialize EEPROM
+  EEPROM.begin(EEPROM_SIZE);
+  
+  // Initialize PWM channels
+  for (int i = 0; i < MAX_PWM_CHANNELS; i++) {
+    pwmChannels[i].pin = -1;
+    pwmChannels[i].channel = i;
+    pwmChannels[i].active = false;
+  }
   
   // Wait for serial to stabilize and flush any boot garbage
   delay(1000);
@@ -33,6 +75,8 @@ void setup() {
   Serial.print("<Version:");
   Serial.print(FW_VERSION);
   Serial.println(">");
+  Serial.println("<INFO:WiFi and Bluetooth disabled for maximum GPIO performance>");
+  Serial.println("<INFO:EEPROM initialized with 512 bytes>");
   
   lastCommandTime = millis();
   lastPingTime = millis();
@@ -58,28 +102,31 @@ void loop() {
     }
   }
 
-  // Multi-stage failsafe detection using both command and ping times
-  unsigned long timeSinceLastCommand = currentTime - lastCommandTime;
-  unsigned long timeSinceLastPing = currentTime - lastPingTime;
+  // Multi-stage failsafe detection - only if output commands were sent
+  // Query-only commands (IDENTIFY, VERSION, READ, etc.) don't trigger failsafe
+  if (outputCommandsSent) {
+    unsigned long timeSinceLastCommand = currentTime - lastCommandTime;
+    unsigned long timeSinceLastPing = currentTime - lastPingTime;
 
-  if (!failsafeEngaged) {
-    // Stage 1: Warning after no activity for FAILSAFE_TIMEOUT
-    unsigned long maxIdleTime = max(timeSinceLastCommand, timeSinceLastPing);
-    if (maxIdleTime > FAILSAFE_TIMEOUT && !failsafeWarningSent) {
-      Serial.println("<WARN:No activity detected for " + String(FAILSAFE_TIMEOUT/1000) + " seconds>");
-      Serial.println("<INFO:Send PING or any command within " + String(FAILSAFE_GRACE_PERIOD/1000) + " seconds to prevent failsafe>");
-      failsafeWarningSent = true;
-    }
+    if (!failsafeEngaged) {
+      // Stage 1: Warning after no activity for FAILSAFE_TIMEOUT
+      unsigned long maxIdleTime = max(timeSinceLastCommand, timeSinceLastPing);
+      if (maxIdleTime > FAILSAFE_TIMEOUT && !failsafeWarningSent) {
+        Serial.println("<WARN:No activity detected for " + String(FAILSAFE_TIMEOUT/1000) + " seconds>");
+        Serial.println("<INFO:Send PING or any command within " + String(FAILSAFE_GRACE_PERIOD/1000) + " seconds to prevent failsafe>");
+        failsafeWarningSent = true;
+      }
 
-    // Stage 2: Engage failsafe after grace period
-    if (maxIdleTime > (FAILSAFE_TIMEOUT + FAILSAFE_GRACE_PERIOD)) {
-      engageFailsafe();
-    }
-  } else {
-    // In failsafe mode: any command disengages failsafe immediately
-    if (timeSinceLastCommand < 1000) { // Recent command received
-      Serial.println("<INFO:Communication detected - Disengaging failsafe>");
-      disengageFailsafe();
+      // Stage 2: Engage failsafe after grace period
+      if (maxIdleTime > (FAILSAFE_TIMEOUT + FAILSAFE_GRACE_PERIOD)) {
+        engageFailsafe();
+      }
+    } else {
+      // In failsafe mode: any command disengages failsafe immediately
+      if (timeSinceLastCommand < 1000) { // Recent command received
+        Serial.println("<INFO:Communication detected - Disengaging failsafe>");
+        disengageFailsafe();
+      }
     }
   }
 }
@@ -133,6 +180,11 @@ void processCommand(String cmd) {
         Serial.println("<PONG>");
         lastPingTime = millis(); // Update ping time for failsafe detection
     }
+    else if (action == "IDENTIFY") {
+        Serial.print("<ESP32_GPIO_BRIDGE:");
+        Serial.print(FW_VERSION);
+        Serial.println(">");
+    }
     else if (action == "VERSION") {
         Serial.print("<"); Serial.print(FW_VERSION); Serial.println(">");
     }
@@ -165,6 +217,16 @@ void processCommand(String cmd) {
     else if (action == "I2C_READ") { handleI2CRead(parts[1], parts[2]); }
     else if (action == "I2S_INIT_TX") { handleI2SInitTx(parts[1], parts[2], parts[3], parts[4]); }
     else if (action == "I2S_WRITE") { handleI2SWrite(parts, partCount); }
+    else if (action == "PWM_INIT") { handlePWMInit(parts[1], parts[2], parts[3]); }
+    else if (action == "PWM_WRITE") { handlePWMWrite(parts[1], parts[2]); }
+    else if (action == "PWM_STOP") { handlePWMStop(parts[1]); }
+    else if (action == "EEPROM_READ") { handleEEPROMRead(parts[1]); }
+    else if (action == "EEPROM_WRITE") { handleEEPROMWrite(parts[1], parts[2]); }
+    else if (action == "EEPROM_READ_BLOCK") { handleEEPROMReadBlock(parts[1], parts[2]); }
+    else if (action == "EEPROM_WRITE_BLOCK") { handleEEPROMWriteBlock(parts, partCount); }
+    else if (action == "EEPROM_COMMIT") { handleEEPROMCommit(); }
+    else if (action == "EEPROM_CLEAR") { handleEEPROMClear(); }
+    else if (action == "BATCH_WRITE") { handleBatchWrite(parts, partCount); }
     else { Serial.println("<ERROR:Unknown command>"); }
 }
 
@@ -179,9 +241,15 @@ void handlePinMode(String pinStr, String modeStr) {
     if (!isValidPin(pin)) { Serial.println("<ERROR:Invalid pin>"); return; }
     trackPin(pin);
     modeStr.toUpperCase();
-    if (modeStr == "OUT") { pinMode(pin, OUTPUT); }
+    if (modeStr == "OUT") { 
+        pinMode(pin, OUTPUT);
+        outputCommandsSent = true;  // Output mode - enable failsafe
+    }
     else if (modeStr == "IN") { pinMode(pin, INPUT); }
-    else if (modeStr == "IN_PULLUP") { pinMode(pin, INPUT_PULLUP); }
+    else if (modeStr == "IN_PULLUP") { 
+        pinMode(pin, INPUT_PULLUP);
+        outputCommandsSent = true;  // Pullup can source current - enable failsafe
+    }
     else { Serial.println("<ERROR:Invalid mode>"); return; }
     Serial.println("<OK>");
 }
@@ -190,6 +258,7 @@ void handleDigitalWrite(String pinStr, String valStr) {
     int pin = pinStr.toInt();
     if (!isValidPin(pin)) { Serial.println("<ERROR:Invalid pin>"); return; }
     digitalWrite(pin, valStr.toInt() == 1 ? HIGH : LOW);
+    outputCommandsSent = true;  // Writing to pin - enable failsafe
     Serial.println("<OK>");
 }
 
@@ -251,6 +320,7 @@ void handleAnalogWrite(String pinStr, String valStr) {
     return;
   }
   dacWrite(pin, value);
+  outputCommandsSent = true;  // DAC output - enable failsafe
   Serial.println("<OK>");
 }
 
@@ -327,5 +397,267 @@ void handleI2SWrite(String parts[], int partCount) {
     }
     i2s_write(I2S_NUM_0, buffer, (partCount-1) * sizeof(int16_t), &bytes_written, portMAX_DELAY);
     delete[] buffer;
+    Serial.println("<OK>");
+}
+
+// PWM Functions
+int findPWMChannel(int pin) {
+    for (int i = 0; i < MAX_PWM_CHANNELS; i++) {
+        if (pwmChannels[i].active && pwmChannels[i].pin == pin) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+int allocatePWMChannel(int pin) {
+    // Check if pin already has a channel
+    int existingChannel = findPWMChannel(pin);
+    if (existingChannel != -1) {
+        return existingChannel;
+    }
+    
+    // Find free channel
+    for (int i = 0; i < MAX_PWM_CHANNELS; i++) {
+        if (!pwmChannels[i].active) {
+            pwmChannels[i].pin = pin;
+            pwmChannels[i].active = true;
+            return i;
+        }
+    }
+    return -1;
+}
+
+void handlePWMInit(String pinStr, String freqStr, String resStr) {
+    int pin = pinStr.toInt();
+    int frequency = freqStr.toInt();
+    int resolution = resStr.toInt();
+    
+    if (!isValidPin(pin)) {
+        Serial.println("<ERROR:Invalid pin>");
+        return;
+    }
+    
+    if (frequency < 1 || frequency > 40000) {
+        Serial.println("<ERROR:Frequency must be between 1 and 40000 Hz>");
+        return;
+    }
+    
+    if (resolution < 1 || resolution > 16) {
+        Serial.println("<ERROR:Resolution must be between 1 and 16 bits>");
+        return;
+    }
+    
+    int channel = allocatePWMChannel(pin);
+    if (channel == -1) {
+        Serial.println("<ERROR:No PWM channels available>");
+        return;
+    }
+    
+    // Use new ESP32 Arduino core 3.x API
+    #if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
+        if (!ledcAttach(pin, frequency, resolution)) {
+            Serial.println("<ERROR:PWM attach failed>");
+            pwmChannels[channel].active = false;
+            pwmChannels[channel].pin = -1;
+            return;
+        }
+    #else
+        // Use old API for compatibility with ESP32 Arduino core 2.x
+        ledcSetup(channel, frequency, resolution);
+        ledcAttachPin(pin, channel);
+    #endif
+    
+    trackPin(pin);
+    outputCommandsSent = true;  // PWM output - enable failsafe
+    
+    Serial.print("<");
+    Serial.print(channel);
+    Serial.println(">");
+}
+
+void handlePWMWrite(String pinStr, String dutyStr) {
+    int pin = pinStr.toInt();
+    int duty = dutyStr.toInt();
+    
+    if (!isValidPin(pin)) {
+        Serial.println("<ERROR:Invalid pin>");
+        return;
+    }
+    
+    int channel = findPWMChannel(pin);
+    if (channel == -1) {
+        Serial.println("<ERROR:PWM not initialized for this pin>");
+        return;
+    }
+    
+    // Both old and new API use ledcWrite, but with different parameters
+    #if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
+        ledcWrite(pin, duty);  // New API uses pin
+    #else
+        ledcWrite(channel, duty);  // Old API uses channel
+    #endif
+    
+    outputCommandsSent = true;  // PWM write - enable failsafe
+    Serial.println("<OK>");
+}
+
+void handlePWMStop(String pinStr) {
+    int pin = pinStr.toInt();
+    
+    if (!isValidPin(pin)) {
+        Serial.println("<ERROR:Invalid pin>");
+        return;
+    }
+    
+    int channel = findPWMChannel(pin);
+    if (channel == -1) {
+        Serial.println("<ERROR:PWM not initialized for this pin>");
+        return;
+    }
+    
+    // Use new or old API depending on version
+    #if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
+        ledcDetach(pin);  // New API
+    #else
+        ledcDetachPin(pin);  // Old API
+    #endif
+    
+    pwmChannels[channel].active = false;
+    pwmChannels[channel].pin = -1;
+    Serial.println("<OK>");
+}
+
+// EEPROM Functions
+void handleEEPROMRead(String addrStr) {
+    int addr = addrStr.toInt();
+    
+    if (addr < 0 || addr >= EEPROM_SIZE) {
+        Serial.println("<ERROR:Address out of range>");
+        return;
+    }
+    
+    byte value = EEPROM.read(addr);
+    Serial.print("<");
+    Serial.print(value);
+    Serial.println(">");
+}
+
+void handleEEPROMWrite(String addrStr, String valStr) {
+    int addr = addrStr.toInt();
+    int value = valStr.toInt();
+    
+    if (addr < 0 || addr >= EEPROM_SIZE) {
+        Serial.println("<ERROR:Address out of range>");
+        return;
+    }
+    
+    if (value < 0 || value > 255) {
+        Serial.println("<ERROR:Value must be between 0 and 255>");
+        return;
+    }
+    
+    EEPROM.write(addr, (byte)value);
+    Serial.println("<OK>");
+}
+
+void handleEEPROMReadBlock(String addrStr, String lenStr) {
+    int addr = addrStr.toInt();
+    int len = lenStr.toInt();
+    
+    if (addr < 0 || addr >= EEPROM_SIZE) {
+        Serial.println("<ERROR:Start address out of range>");
+        return;
+    }
+    
+    if (len < 1 || (addr + len) > EEPROM_SIZE) {
+        Serial.println("<ERROR:Length invalid or exceeds EEPROM size>");
+        return;
+    }
+    
+    String data = "";
+    for (int i = 0; i < len; i++) {
+        if (i > 0) data += " ";
+        data += String(EEPROM.read(addr + i));
+    }
+    
+    Serial.print("<");
+    Serial.print(data);
+    Serial.println(">");
+}
+
+void handleEEPROMWriteBlock(String parts[], int partCount) {
+    if (partCount < 3) {
+        Serial.println("<ERROR:Invalid parameters>");
+        return;
+    }
+    
+    int addr = parts[1].toInt();
+    
+    if (addr < 0 || addr >= EEPROM_SIZE) {
+        Serial.println("<ERROR:Address out of range>");
+        return;
+    }
+    
+    int dataCount = partCount - 2;
+    if ((addr + dataCount) > EEPROM_SIZE) {
+        Serial.println("<ERROR:Data exceeds EEPROM size>");
+        return;
+    }
+    
+    for (int i = 0; i < dataCount; i++) {
+        int value = parts[i + 2].toInt();
+        if (value < 0 || value > 255) {
+            Serial.println("<ERROR:Value must be between 0 and 255>");
+            return;
+        }
+        EEPROM.write(addr + i, (byte)value);
+    }
+    
+    Serial.println("<OK>");
+}
+
+void handleEEPROMCommit() {
+    if (EEPROM.commit()) {
+        Serial.println("<OK>");
+    } else {
+        Serial.println("<ERROR:EEPROM commit failed>");
+    }
+}
+
+void handleEEPROMClear() {
+    for (int i = 0; i < EEPROM_SIZE; i++) {
+        EEPROM.write(i, 0);
+    }
+    if (EEPROM.commit()) {
+        Serial.println("<OK>");
+    } else {
+        Serial.println("<ERROR:EEPROM clear failed>");
+    }
+}
+
+// Batch Operations
+void handleBatchWrite(String parts[], int partCount) {
+    if (partCount < 3 || (partCount - 1) % 2 != 0) {
+        Serial.println("<ERROR:Invalid batch format. Use: BATCH_WRITE pin1 val1 pin2 val2 ...>");
+        return;
+    }
+    
+    int numPairs = (partCount - 1) / 2;
+    for (int i = 0; i < numPairs; i++) {
+        int pin = parts[1 + i * 2].toInt();
+        int value = parts[2 + i * 2].toInt();
+        
+        if (!isValidPin(pin)) {
+            Serial.print("<ERROR:Invalid pin ");
+            Serial.print(pin);
+            Serial.println(">");
+            return;
+        }
+        
+        digitalWrite(pin, value == 1 ? HIGH : LOW);
+    }
+    
+    outputCommandsSent = true;  // Batch write - enable failsafe
     Serial.println("<OK>");
 }

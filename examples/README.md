@@ -28,6 +28,12 @@ Before running any examples, ensure you have:
   - SSD1306 OLED display
   - Any other I2C device
 
+### Advanced Features Example
+- LED connected to GPIO pin 2 (for PWM dimming demonstration)
+- Optional: Motor with PWM control connected to GPIO pin 16
+- Optional: Multiple LEDs on GPIO pins 12, 13, 14, 15 (for batch operations)
+- No additional hardware required for EEPROM features
+
 ## Running Examples
 
 ### Basic I/O Example
@@ -52,6 +58,19 @@ This example demonstrates:
 - I2C bus initialization and device scanning
 - Reading from multiple I2C sensors
 - Generic I2C device communication
+
+### Advanced Features Example (NEW in v0.1.3-beta)
+
+```bash
+python advanced_features_example.py
+```
+
+This example demonstrates:
+- PWM control for LED dimming and motor control
+- EEPROM storage for persistent data
+- Batch GPIO operations for efficiency
+- String and configuration storage in EEPROM
+- Performance comparison between traditional and batch operations
 
 ## Troubleshooting
 
@@ -100,7 +119,7 @@ print("Available ports:", ports)
 ### Basic I/O Example
 ```
 Found ESP32 on port: /dev/ttyUSB0
-Connected to ESP32. Firmware version: 0.1.1-beta
+Connected to ESP32. Firmware version: 0.1.3-beta
 
 LED Pin 2 capabilities:
   - Digital Write: True

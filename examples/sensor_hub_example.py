@@ -17,7 +17,7 @@ Usage:
 
 import time
 import logging
-from esp32_gpio_bridge import ESP32GPIO, find_esp32_port, config
+from esp32_gpio_bridge import ESP32GPIO, find_esp32_port, select_port, config
 
 
 def main():
@@ -26,12 +26,26 @@ def main():
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
     # Auto-detect ESP32 port
+    print("Searching for ESP32 GPIO Bridge...")
     port = find_esp32_port()
     if not port:
-        print("ESP32 not auto-detected. Please connect your ESP32 and try again.")
-        return
+        print("\n❌ ESP32 GPIO Bridge not found!")
+        print("\nTroubleshooting:")
+        print("1. Make sure your ESP32 is connected via USB")
+        print("2. Ensure the firmware (esp32_GPIO_bridge.ino) is flashed")
+        print("3. Check that no other program is using the serial port")
+        print("\nWould you like to manually select a port? (y/n): ", end="")
+        choice = input().strip().lower()
+        if choice == 'y':
+            port = select_port()
+            if not port:
+                print("No port selected. Exiting.")
+                return
+        else:
+            print("Exiting.")
+            return
 
-    print(f"Found ESP32 on port: {port}")
+    print(f"✓ Found ESP32 GPIO Bridge on port: {port}")
 
     try:
         with ESP32GPIO(port) as esp:

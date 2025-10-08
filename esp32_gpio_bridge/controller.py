@@ -2,10 +2,10 @@
 ESP32 GPIO Bridge - Python Library for ESP32 GPIO Control
 
 This module provides a comprehensive Python interface for controlling ESP32 GPIO pins,
-analog I/O, I2C communication, and I2S audio from a host computer via USB serial connection.
+analog I/O, I2C communication, I2S audio, PWM, and EEPROM from a host computer via USB serial connection.
 
 Author: ESP32 GPIO Bridge Project
-Version: 0.1.1-beta
+Version: 0.1.3-beta
 """
 
 import serial
@@ -51,6 +51,8 @@ class ESP32GPIO:
         self.adc_initialized = False
         self.i2c_initialized = False
         self.i2s_initialized = False
+        self.pwm_channels: Dict[int, int] = {}  # pin -> channel mapping
+        self.eeprom_initialized = False
 
         # Logging setup
         self.logger = logging.getLogger(f"ESP32GPIO.{port}")
@@ -61,15 +63,25 @@ class ESP32GPIO:
     def connect(self) -> None:
         """Establish connection to the ESP32 GPIO Bridge."""
         try:
-            self.ser = serial.Serial(self.port, self.baudrate, timeout=self.timeout)
+            # Open serial port with DTR/RTS disabled to prevent auto-reset
+            self.ser = serial.Serial(
+                self.port, 
+                self.baudrate, 
+                timeout=self.timeout,
+                dsrdtr=False,  # Disable DTR
+                rtscts=False   # Disable RTS
+            )
             self._is_running = True
 
             self.read_thread = threading.Thread(target=self._read_from_port, daemon=True)
             self.read_thread.start()
 
-            # Wait for ESP32 to initialize
+            # Wait for ESP32 to boot (in case it was auto-reset)
             self.logger.info("Waiting for ESP32 to initialize...")
-            time.sleep(3)
+            time.sleep(0.5)
+            
+            # Drain any boot messages from buffer
+            self._drain_boot_messages(duration=1.0)
 
             # Initialize connection and get version
             self._initialize_connection()
@@ -86,29 +98,69 @@ class ESP32GPIO:
         except serial.SerialException as e:
             raise IOError(f"Failed to connect to ESP32 on {self.port}: {e}")
 
+    def _drain_boot_messages(self, duration: float = 1.0) -> None:
+        """
+        Drain boot messages and garbage data from serial buffer.
+        
+        Args:
+            duration: How long to drain buffer in seconds
+        """
+        self.logger.debug("Draining boot messages from buffer...")
+        start_time = time.time()
+        drained_count = 0
+        
+        while (time.time() - start_time) < duration:
+            try:
+                # Clear response queue
+                while not self.response_queue.empty():
+                    try:
+                        self.response_queue.get_nowait()
+                        drained_count += 1
+                    except Empty:
+                        break
+                time.sleep(0.05)
+            except:
+                break
+        
+        if drained_count > 0:
+            self.logger.debug(f"Drained {drained_count} boot messages")
+
     def _initialize_connection(self) -> None:
         """Initialize connection and verify ESP32 readiness."""
-        max_attempts = 10
-        ready_found = False
-
+        max_attempts = 5
+        
+        # Try PING command first (doesn't trigger failsafe)
         for attempt in range(max_attempts):
             try:
-                response = self.get_response(timeout=1)
-                if 'Ready' in response:
-                    ready_found = True
-                    # Get version message
+                self.logger.debug(f"Sending PING (attempt {attempt + 1}/{max_attempts})...")
+                with self.lock:
+                    # Clear queue
+                    while not self.response_queue.empty():
+                        try:
+                            self.response_queue.get_nowait()
+                        except Empty:
+                            break
+                    
+                    self.ser.write(b"<PING>")
+                    time.sleep(0.1)
+                    
+                    # Try to get PONG response
                     try:
-                        self.get_response(timeout=0.5)
-                    except TimeoutError:
-                        pass  # Version message might not be present
-                    break
-            except TimeoutError:
+                        response = self.response_queue.get(timeout=1.0)
+                        if "PONG" in response:
+                            self.logger.debug("Received PONG - ESP32 is ready")
+                            return
+                    except Empty:
+                        pass
+                
+                time.sleep(0.3)
+                
+            except Exception as e:
+                self.logger.debug(f"Connection attempt {attempt + 1} failed: {e}")
                 if attempt < max_attempts - 1:
-                    self.logger.debug(f"Attempt {attempt + 1}/{max_attempts}... retrying")
                     time.sleep(0.5)
-
-        if not ready_found:
-            raise IOError("Failed to connect to ESP32. Check port and firmware.")
+        
+        raise IOError("Failed to connect to ESP32. Check port and firmware.")
 
     def _read_from_port(self) -> None:
         """Background thread to read serial responses."""
@@ -379,6 +431,242 @@ class ESP32GPIO:
         """
         return self.reset_failsafe()
 
+    # PWM Functions
+    def pwm_init(self, pin: int, frequency: int = 5000, resolution: int = 8) -> int:
+        """
+        Initialize PWM on a pin.
+
+        Args:
+            pin: GPIO pin number
+            frequency: PWM frequency in Hz (1-40000, default: 5000)
+            resolution: PWM resolution in bits (1-16, default: 8)
+
+        Returns:
+            PWM channel number assigned to the pin
+
+        Raises:
+            ValueError: If parameters are invalid
+        """
+        if not 0 <= pin < 40:
+            raise ValueError(f"Invalid pin number: {pin}. Must be 0-39.")
+        if not 1 <= frequency <= 40000:
+            raise ValueError(f"Invalid frequency: {frequency}. Must be 1-40000 Hz.")
+        if not 1 <= resolution <= 16:
+            raise ValueError(f"Invalid resolution: {resolution}. Must be 1-16 bits.")
+
+        response = self._send_command(f"PWM_INIT {pin} {frequency} {resolution}")
+        channel = int(response)  # type: ignore[arg-type]
+        self.pwm_channels[pin] = channel
+        return channel
+
+    def pwm_write(self, pin: int, duty_cycle: int) -> None:
+        """
+        Set PWM duty cycle on a pin.
+
+        Args:
+            pin: GPIO pin number
+            duty_cycle: Duty cycle value (0 to 2^resolution - 1)
+
+        Raises:
+            ValueError: If pin doesn't have PWM initialized
+        """
+        if not 0 <= pin < 40:
+            raise ValueError(f"Invalid pin number: {pin}. Must be 0-39.")
+        if pin not in self.pwm_channels:
+            raise ValueError(f"PWM not initialized on pin {pin}. Call pwm_init() first.")
+
+        self._send_command(f"PWM_WRITE {pin} {duty_cycle}")
+
+    def pwm_stop(self, pin: int) -> None:
+        """
+        Stop PWM on a pin and release the channel.
+
+        Args:
+            pin: GPIO pin number
+        """
+        if not 0 <= pin < 40:
+            raise ValueError(f"Invalid pin number: {pin}. Must be 0-39.")
+
+        self._send_command(f"PWM_STOP {pin}")
+        if pin in self.pwm_channels:
+            del self.pwm_channels[pin]
+
+    def pwm_set_duty_percent(self, pin: int, percent: float) -> None:
+        """
+        Set PWM duty cycle as a percentage.
+
+        Args:
+            pin: GPIO pin number
+            percent: Duty cycle as percentage (0.0 to 100.0)
+
+        Raises:
+            ValueError: If pin doesn't have PWM initialized or percent is invalid
+        """
+        if not 0 <= pin < 40:
+            raise ValueError(f"Invalid pin number: {pin}. Must be 0-39.")
+        if pin not in self.pwm_channels:
+            raise ValueError(f"PWM not initialized on pin {pin}. Call pwm_init() first.")
+        if not 0.0 <= percent <= 100.0:
+            raise ValueError(f"Invalid percent: {percent}. Must be 0.0-100.0.")
+
+        # Assume 8-bit resolution by default (0-255)
+        duty_cycle = int((percent / 100.0) * 255)
+        self.pwm_write(pin, duty_cycle)
+
+    # EEPROM Functions
+    def eeprom_read(self, address: int) -> int:
+        """
+        Read a single byte from EEPROM.
+
+        Args:
+            address: EEPROM address (0-511)
+
+        Returns:
+            Byte value at the address (0-255)
+
+        Raises:
+            ValueError: If address is out of range
+        """
+        if not 0 <= address < 512:
+            raise ValueError(f"Invalid EEPROM address: {address}. Must be 0-511.")
+
+        response = self._send_command(f"EEPROM_READ {address}")
+        return int(response)  # type: ignore[arg-type]
+
+    def eeprom_write(self, address: int, value: int) -> None:
+        """
+        Write a single byte to EEPROM (requires commit to persist).
+
+        Args:
+            address: EEPROM address (0-511)
+            value: Byte value to write (0-255)
+
+        Raises:
+            ValueError: If address or value is invalid
+        """
+        if not 0 <= address < 512:
+            raise ValueError(f"Invalid EEPROM address: {address}. Must be 0-511.")
+        if not 0 <= value <= 255:
+            raise ValueError(f"Invalid value: {value}. Must be 0-255.")
+
+        self._send_command(f"EEPROM_WRITE {address} {value}")
+
+    def eeprom_read_block(self, address: int, length: int) -> List[int]:
+        """
+        Read a block of bytes from EEPROM.
+
+        Args:
+            address: Starting EEPROM address
+            length: Number of bytes to read
+
+        Returns:
+            List of byte values
+
+        Raises:
+            ValueError: If address or length is invalid
+        """
+        if not 0 <= address < 512:
+            raise ValueError(f"Invalid EEPROM address: {address}. Must be 0-511.")
+        if not 1 <= length <= (512 - address):
+            raise ValueError(f"Invalid length: {length}.")
+
+        response = self._send_command(f"EEPROM_READ_BLOCK {address} {length}")
+        return [int(x) for x in response.split()]  # type: ignore[union-attr]
+
+    def eeprom_write_block(self, address: int, data: List[int]) -> None:
+        """
+        Write a block of bytes to EEPROM (requires commit to persist).
+
+        Args:
+            address: Starting EEPROM address
+            data: List of byte values to write
+
+        Raises:
+            ValueError: If address or data is invalid
+        """
+        if not 0 <= address < 512:
+            raise ValueError(f"Invalid EEPROM address: {address}. Must be 0-511.")
+        if not data or (address + len(data)) > 512:
+            raise ValueError(f"Invalid data length or exceeds EEPROM size.")
+
+        for value in data:
+            if not 0 <= value <= 255:
+                raise ValueError(f"Invalid value in data: {value}. Must be 0-255.")
+
+        data_str = " ".join(str(x) for x in data)
+        self._send_command(f"EEPROM_WRITE_BLOCK {address} {data_str}")
+
+    def eeprom_commit(self) -> None:
+        """
+        Commit EEPROM changes to flash memory.
+        This must be called after eeprom_write() to persist changes.
+        """
+        self._send_command("EEPROM_COMMIT")
+
+    def eeprom_clear(self) -> None:
+        """
+        Clear all EEPROM data (set all bytes to 0) and commit.
+        """
+        self._send_command("EEPROM_CLEAR")
+
+    def eeprom_write_string(self, address: int, text: str) -> None:
+        """
+        Write a string to EEPROM.
+
+        Args:
+            address: Starting EEPROM address
+            text: String to write
+
+        Raises:
+            ValueError: If string is too long or address is invalid
+        """
+        data = [ord(c) for c in text]
+        self.eeprom_write_block(address, data)
+
+    def eeprom_read_string(self, address: int, length: int) -> str:
+        """
+        Read a string from EEPROM.
+
+        Args:
+            address: Starting EEPROM address
+            length: Number of bytes to read
+
+        Returns:
+            String read from EEPROM
+        """
+        data = self.eeprom_read_block(address, length)
+        # Stop at first null terminator
+        result = []
+        for byte in data:
+            if byte == 0:
+                break
+            result.append(chr(byte))
+        return ''.join(result)
+
+    # Batch Operations
+    def batch_digital_write(self, pin_values: Dict[int, Union[int, bool]]) -> None:
+        """
+        Write multiple digital pins in a single command for efficiency.
+
+        Args:
+            pin_values: Dictionary mapping pin numbers to values (0/1 or False/True)
+
+        Example:
+            >>> esp.batch_digital_write({2: 1, 4: 0, 5: 1})
+        """
+        if not pin_values:
+            raise ValueError("pin_values dictionary cannot be empty")
+
+        # Build command string
+        parts = ["BATCH_WRITE"]
+        for pin, value in pin_values.items():
+            if not 0 <= pin < 40:
+                raise ValueError(f"Invalid pin number: {pin}. Must be 0-39.")
+            int_value = 1 if value else 0
+            parts.extend([str(pin), str(int_value)])
+
+        self._send_command(" ".join(parts))
+
 
 def list_serial_ports() -> List[Tuple[str, str]]:
     """
@@ -425,26 +713,122 @@ def select_port() -> Optional[str]:
             print("Invalid input. Please enter a number or 'q' to quit.")
 
 
-def find_esp32_port() -> Optional[str]:
+def find_esp32_port(timeout: float = 2.0) -> Optional[str]:
     """
-    Auto-detect ESP32 port by looking for common ESP32 device descriptions.
+    Auto-detect ESP32 GPIO Bridge by actively probing serial ports.
+    
+    This function tests each available serial port by sending an IDENTIFY
+    command and checking for the ESP32 GPIO Bridge signature in the response.
+
+    Args:
+        timeout: Timeout in seconds for each port test (default: 2.0)
 
     Returns:
         ESP32 port device path or None if not found
     """
+    import logging
+    logger = logging.getLogger("ESP32GPIO.AutoDetect")
+    
     ports = list_serial_ports()
-
-    # Common ESP32 device identifiers
-    esp32_identifiers = [
-        'esp32', 'esp32-s2', 'esp32-s3', 'esp32-c3', 'esp32-c6',
-        'silicon labs', 'cp210x', 'ch340', 'ftdi'
-    ]
-
+    
+    if not ports:
+        logger.debug("No serial ports found")
+        return None
+    
+    # Filter to likely ESP32 ports for faster detection
+    likely_ports = []
     for device, description in ports:
-        desc_lower = description.lower()
-        if any(identifier in desc_lower for identifier in esp32_identifiers):
-            return device
-
+        device_lower = device.lower()
+        # Common ESP32 serial port patterns
+        if any(pattern in device_lower for pattern in ['ttyusb', 'ttyacm', 'com', 'cu.usb', 'cu.wch']):
+            likely_ports.append(device)
+        # Also check USB description as fallback
+        elif any(id in description.lower() for id in ['esp32', 'cp210', 'ch340', 'ftdi', 'silicon labs']):
+            likely_ports.append(device)
+    
+    # If no likely ports found, test all ports
+    if not likely_ports:
+        likely_ports = [device for device, _ in ports]
+    
+    logger.debug(f"Testing {len(likely_ports)} port(s) for ESP32 GPIO Bridge")
+    
+    # Test each port by sending IDENTIFY command
+    for port in likely_ports:
+        try:
+            logger.debug(f"Probing {port}...")
+            
+            # Open port with DTR/RTS disabled to prevent auto-reset
+            ser = serial.Serial(
+                port, 
+                115200, 
+                timeout=timeout,
+                dsrdtr=False,  # Disable DTR to prevent reset
+                rtscts=False   # Disable RTS
+            )
+            
+            # Wait for any auto-reset to complete and ESP32 to boot
+            time.sleep(0.3)
+            
+            # Drain boot messages
+            start_drain = time.time()
+            while (time.time() - start_drain) < 0.5:
+                if ser.in_waiting:
+                    try:
+                        ser.read(ser.in_waiting)
+                    except:
+                        pass
+                time.sleep(0.05)
+            
+            # Clear buffer one more time
+            ser.reset_input_buffer()
+            
+            # Try multiple times with PING first (fastest, safest)
+            for attempt in range(3):
+                ser.write(b"<PING>")
+                time.sleep(0.1)
+                
+                start_time = time.time()
+                while (time.time() - start_time) < 0.5:
+                    if ser.in_waiting:
+                        try:
+                            line = ser.readline().decode('utf-8', errors='ignore').strip()
+                            if "PONG" in line:
+                                ser.close()
+                                logger.info(f"Found ESP32 GPIO Bridge on {port}")
+                                return port
+                        except:
+                            pass
+                    time.sleep(0.01)
+                
+                time.sleep(0.1)
+            
+            # Try IDENTIFY command
+            ser.write(b"<IDENTIFY>")
+            time.sleep(0.1)
+            
+            start_time = time.time()
+            while (time.time() - start_time) < 0.5:
+                if ser.in_waiting:
+                    try:
+                        line = ser.readline().decode('utf-8', errors='ignore').strip()
+                        if "ESP32_GPIO_BRIDGE" in line:
+                            ser.close()
+                            logger.info(f"Found ESP32 GPIO Bridge on {port}")
+                            return port
+                    except:
+                        pass
+                time.sleep(0.01)
+            
+            ser.close()
+            
+        except (serial.SerialException, OSError, PermissionError) as e:
+            logger.debug(f"Could not probe {port}: {e}")
+            continue
+        except Exception as e:
+            logger.debug(f"Unexpected error probing {port}: {e}")
+            continue
+    
+    logger.warning("ESP32 GPIO Bridge not found on any port")
     return None
 
 
