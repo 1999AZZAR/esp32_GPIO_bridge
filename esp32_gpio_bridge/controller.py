@@ -141,7 +141,8 @@ class ESP32GPIO:
                         except Empty:
                             break
                     
-                    self.ser.write(b"<PING>")
+                    if self.ser:
+                        self.ser.write(b"<PING>")
                     time.sleep(0.1)
                     
                     # Try to get PONG response

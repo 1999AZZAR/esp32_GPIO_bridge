@@ -155,6 +155,10 @@ None - fully backward compatible with existing Python library and examples.
   - These messages were contaminating the response queue
   - Now properly filtered and logged as debug messages
   - Fixes ValueError when ESP32 errors occur on GPIO 36-39 (input-only pins)
+- **Fixed mypy type checking error** - Added null check for `self.ser` before calling `write()` method
+  - GitHub workflow was failing due to union-attr error on line 144
+  - Added `if self.ser:` check to prevent accessing None object
+  - Added `types-pyserial` dependency to requirements.txt for proper type stubs
 - **Fixed ALL write commands expecting responses** - 11 total commands now correctly use `expect_response=False`:
   - GPIO: set_pin_mode(), digital_write(), analog_write()
   - PWM: pwm_write(), pwm_stop()

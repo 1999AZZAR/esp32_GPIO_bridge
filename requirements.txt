@@ -1,5 +1,6 @@
 # Core dependencies for ESP32 GPIO Bridge
 pyserial>=3.5
+types-pyserial>=3.5
 
 # Optional dependencies for enhanced functionality
 # Install with: pip install -r requirements.txt
