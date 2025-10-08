@@ -27,7 +27,7 @@ The system communicates over a simple, text-based serial protocol via USB connec
 - **I2S Audio Support:** Audio data transmission capabilities
 - **Pin Management:** Advanced pin capability detection and validation system
 - **Configuration Presets:** Pre-configured setups for common applications
-- **Enhanced Failsafe System:** Intelligent multi-stage failsafe with graceful recovery
+- **Enhanced Failsafe System:** Intelligent multi-stage failsafe with instant recovery and manual control
 - **Context Manager Support:** Automatic resource cleanup with `with` statements
 
 ## Enhanced Failsafe Mechanism
@@ -45,15 +45,16 @@ The firmware includes an intelligent multi-stage failsafe system to prevent hard
    - All configured pins are reset to INPUT mode for safety
    - Detailed logging of which pins were reset
    - System enters protected state
-3. **Recovery Detection** (sustained communication):
+3. **Recovery Detection** (immediate):
 
-   - Monitors for sustained communication (5 seconds)
-   - Automatically disengages failsafe when stable connection detected
+   - Any command immediately disengages failsafe
+   - No waiting period required for recovery
 
 ### Failsafe Features
 
 - **Dual Monitoring**: Tracks both command activity and PING responses
-- **Graceful Recovery**: Requires sustained communication before disengaging failsafe
+- **Instant Recovery**: Any command immediately disengages failsafe (no waiting period)
+- **Manual Control**: Commands like `RESET_FAILSAFE` provide manual control
 - **Detailed Logging**: Provides comprehensive status information
 - **Pin Safety**: Automatically resets all configured pins to INPUT mode
 - **Status Query**: Use `STATUS` command to check current failsafe state
@@ -67,10 +68,27 @@ The firmware includes an intelligent multi-stage failsafe system to prevent hard
 <INFO:All configured pins reset to INPUT mode for safety>
 <INFO:Reset pin 2 to INPUT>
 <INFO:Reset pin 34 to INPUT>
-<INFO:Failsafe active - Waiting for communication recovery>
-<INFO:Sustained communication detected - Disengaging failsafe>
+<INFO:Failsafe active - Send any command to disengage>
+<INFO:Communication detected - Disengaging failsafe>
 <INFO:Failsafe disengaged - Normal operation resumed>
 ```
+
+### Manual Failsafe Control
+
+You can also manually control the failsafe system:
+
+```python
+# Check if failsafe is engaged
+status = esp.get_status()
+print(f"Failsafe engaged: {status['failsafe_engaged']}")
+
+# Manually reset failsafe (works even when engaged)
+success = esp.reset_failsafe()  # or esp.clear_failsafe() or esp.disable_failsafe()
+print(f"Failsafe reset: {success}")
+```
+
+**ESP32 Commands:**
+- `RESET_FAILSAFE`, `CLEAR_FAILSAFE`, `DISABLE_FAILSAFE` - Manually disengage failsafe
 
 ## Installation
 
@@ -164,6 +182,17 @@ status = esp.get_status()
 print(f"ESP32 State: {status['state']}")
 print(f"Failsafe engaged: {status['failsafe_engaged']}")
 print(f"Time since last command: {status['time_since_command']}ms")
+```
+
+### Failsafe Control
+
+```python
+# Manually reset failsafe mode
+success = esp.reset_failsafe()  # Returns True if reset, False if not engaged
+
+# Alternative methods (aliases)
+success = esp.clear_failsafe()
+success = esp.disable_failsafe()
 ```
 
 ### Digital I/O Operations
@@ -382,6 +411,9 @@ Communication uses **115200 baud** with commands/responses wrapped in `<...>` de
 | `VERSION`                              | None                              | Returns firmware version               |
 | `PING`                                 | None                              | Watchdog keep-alive (returns `PONG`)   |
 | `STATUS`                               | None                              | Returns current system status          |
+| `RESET_FAILSAFE`                       | None                              | Manually disengage failsafe mode       |
+| `CLEAR_FAILSAFE`                       | None                              | Manually disengage failsafe mode       |
+| `DISABLE_FAILSAFE`                     | None                              | Manually disengage failsafe mode       |
 | `MODE <pin> <mode>`                    | pin: 0-39, mode: IN/OUT/IN_PULLUP | Set pin mode                           |
 | `WRITE <pin> <value>`                  | pin: 0-39, value: 0/1             | Digital write                          |
 | `READ <pin>`                           | pin: 0-39                         | Digital read (returns 0/1)             |

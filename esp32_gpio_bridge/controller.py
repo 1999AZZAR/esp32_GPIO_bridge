@@ -348,6 +348,37 @@ class ESP32GPIO:
         """
         return self.configured_pins.copy()
 
+    def reset_failsafe(self) -> bool:
+        """
+        Manually reset/disable failsafe mode.
+
+        Returns:
+            True if failsafe was engaged and reset, False if not engaged
+        """
+        try:
+            response = self._send_command("RESET_FAILSAFE")
+            return response is not None and "OK" in response
+        except (ValueError, IOError):
+            return False
+
+    def clear_failsafe(self) -> bool:
+        """
+        Alias for reset_failsafe() for convenience.
+
+        Returns:
+            True if failsafe was engaged and reset, False if not engaged
+        """
+        return self.reset_failsafe()
+
+    def disable_failsafe(self) -> bool:
+        """
+        Alias for reset_failsafe() for convenience.
+
+        Returns:
+            True if failsafe was engaged and reset, False if not engaged
+        """
+        return self.reset_failsafe()
+
 
 def list_serial_ports() -> List[Tuple[str, str]]:
     """

@@ -76,13 +76,10 @@ void loop() {
       engageFailsafe();
     }
   } else {
-    // In failsafe mode: check for sustained recovery
-    if (timeSinceLastCommand < FAILSAFE_RECOVERY_TIMEOUT && timeSinceLastPing < FAILSAFE_RECOVERY_TIMEOUT) {
-      // Sustained communication for recovery period - disengage failsafe
-      Serial.println("<INFO:Sustained communication detected - Disengaging failsafe>");
+    // In failsafe mode: any command disengages failsafe immediately
+    if (timeSinceLastCommand < 1000) { // Recent command received
+      Serial.println("<INFO:Communication detected - Disengaging failsafe>");
       disengageFailsafe();
-    } else if (timeSinceLastCommand < 1000) { // Recent command but not sustained
-      Serial.println("<INFO:Recent communication detected - Monitoring for sustained recovery>");
     }
   }
 }
@@ -147,6 +144,15 @@ void processCommand(String cmd) {
         Serial.print(",");
         Serial.print(millis() - lastPingTime);
         Serial.println(">");
+    }
+    else if (action == "RESET_FAILSAFE" || action == "CLEAR_FAILSAFE" || action == "DISABLE_FAILSAFE") {
+        if (failsafeEngaged) {
+            Serial.println("<INFO:Manually disengaging failsafe>");
+            disengageFailsafe();
+            Serial.println("<OK>");
+        } else {
+            Serial.println("<INFO:Failsafe not engaged>");
+        }
     }
     else if (action == "MODE") { handlePinMode(parts[1], parts[2]); }
     else if (action == "WRITE") { handleDigitalWrite(parts[1], parts[2]); }

@@ -135,6 +135,11 @@ def main():
 
             print(f"\nConfigured pins during this session: {esp.get_configured_pins()}")
 
+            # Demo: Test failsafe reset functionality
+            print("\nTesting failsafe reset functionality...")
+            reset_result = esp.reset_failsafe()
+            print(f"Failsafe reset result: {reset_result}")
+
             print(f"\n{'='*50}")
             print("EXAMPLE COMPLETED SUCCESSFULLY")
             print(f"{'='*50}")
