@@ -212,7 +212,7 @@ class ESP32GPIO:
             raise IOError("ESP32 not connected")
 
         with self.lock:
-            # Clear any pending responses
+            # Clear any pending responses (including PONG from ping thread)
             while not self.response_queue.empty():
                 try:
                     self.response_queue.get_nowait()
@@ -222,10 +222,40 @@ class ESP32GPIO:
             self.ser.write(f"<{command}>".encode('utf-8'))
 
             if expect_response:
-                response = self.get_response()
-                if response.startswith("ERROR"):
-                    raise ValueError(f"ESP32 Error: {response}")
-                return response  # type: ignore[return-value]
+                # Filter out PONG, STATUS, and stale ERROR responses from queue
+                max_attempts = 10
+                for attempt in range(max_attempts):
+                    try:
+                        response = self.get_response(timeout=0.5)
+                        
+                        # Skip PONG responses from ping thread
+                        if response == "PONG":
+                            continue
+                        
+                        # Skip STATUS responses unless we asked for STATUS
+                        if response.startswith("STATUS:") and not command.startswith("STATUS"):
+                            continue
+                        
+                        # Skip stale ERROR messages that don't match current command
+                        # (These are from previous write commands that we already handled)
+                        if response.startswith("ERROR"):
+                            # If this is the first attempt, it might be a real error for this command
+                            if attempt == 0:
+                                raise ValueError(f"ESP32 Error: {response}")
+                            # Otherwise it's likely stale, skip it
+                            continue
+                        
+                        # Return actual response
+                        return response  # type: ignore[return-value]
+                    except TimeoutError:
+                        # If we timeout, the command might not send a response
+                        if attempt == 0:
+                            raise
+                        # Otherwise keep trying to find valid response
+                        continue
+                
+                # If we only got noise, raise error
+                raise TimeoutError("No valid response from ESP32 (only got PONG/STATUS/stale errors)")
             return None
 
     def _send_pings(self) -> None:
@@ -318,7 +348,7 @@ class ESP32GPIO:
         if mode not in ['IN', 'OUT', 'IN_PULLUP']:
             raise ValueError(f"Invalid mode: {mode}. Must be 'IN', 'OUT', or 'IN_PULLUP'.")
 
-        self._send_command(f"MODE {pin} {mode}")
+        self._send_command(f"MODE {pin} {mode}", expect_response=False)
 
         # Track configured pins
         if pin not in self.configured_pins:
@@ -336,7 +366,7 @@ class ESP32GPIO:
             raise ValueError(f"Invalid pin number: {pin}. Must be 0-39.")
 
         int_value = 1 if value else 0
-        self._send_command(f"WRITE {pin} {int_value}")
+        self._send_command(f"WRITE {pin} {int_value}", expect_response=False)
 
     def digital_read(self, pin: int) -> int:
         """
@@ -389,7 +419,7 @@ class ESP32GPIO:
         if not 0 <= value <= 255:
             raise ValueError(f"Invalid DAC value: {value}. Must be between 0 and 255.")
 
-        self._send_command(f"AWRITE {pin} {value}")
+        self._send_command(f"AWRITE {pin} {value}", expect_response=False)
 
     def get_configured_pins(self) -> List[int]:
         """
@@ -475,7 +505,7 @@ class ESP32GPIO:
         if pin not in self.pwm_channels:
             raise ValueError(f"PWM not initialized on pin {pin}. Call pwm_init() first.")
 
-        self._send_command(f"PWM_WRITE {pin} {duty_cycle}")
+        self._send_command(f"PWM_WRITE {pin} {duty_cycle}", expect_response=False)
 
     def pwm_stop(self, pin: int) -> None:
         """
@@ -487,7 +517,7 @@ class ESP32GPIO:
         if not 0 <= pin < 40:
             raise ValueError(f"Invalid pin number: {pin}. Must be 0-39.")
 
-        self._send_command(f"PWM_STOP {pin}")
+        self._send_command(f"PWM_STOP {pin}", expect_response=False)
         if pin in self.pwm_channels:
             del self.pwm_channels[pin]
 
@@ -549,7 +579,7 @@ class ESP32GPIO:
         if not 0 <= value <= 255:
             raise ValueError(f"Invalid value: {value}. Must be 0-255.")
 
-        self._send_command(f"EEPROM_WRITE {address} {value}")
+        self._send_command(f"EEPROM_WRITE {address} {value}", expect_response=False)
 
     def eeprom_read_block(self, address: int, length: int) -> List[int]:
         """
@@ -594,20 +624,20 @@ class ESP32GPIO:
                 raise ValueError(f"Invalid value in data: {value}. Must be 0-255.")
 
         data_str = " ".join(str(x) for x in data)
-        self._send_command(f"EEPROM_WRITE_BLOCK {address} {data_str}")
+        self._send_command(f"EEPROM_WRITE_BLOCK {address} {data_str}", expect_response=False)
 
     def eeprom_commit(self) -> None:
         """
         Commit EEPROM changes to flash memory.
         This must be called after eeprom_write() to persist changes.
         """
-        self._send_command("EEPROM_COMMIT")
+        self._send_command("EEPROM_COMMIT", expect_response=False)
 
     def eeprom_clear(self) -> None:
         """
         Clear all EEPROM data (set all bytes to 0) and commit.
         """
-        self._send_command("EEPROM_CLEAR")
+        self._send_command("EEPROM_CLEAR", expect_response=False)
 
     def eeprom_write_string(self, address: int, text: str) -> None:
         """
@@ -657,15 +687,139 @@ class ESP32GPIO:
         if not pin_values:
             raise ValueError("pin_values dictionary cannot be empty")
 
-        # Build command string
-        parts = ["BATCH_WRITE"]
+        # Build command string: "BATCH_WRITE pin1 val1 pin2 val2 ..."
+        parts = []
         for pin, value in pin_values.items():
             if not 0 <= pin < 40:
                 raise ValueError(f"Invalid pin number: {pin}. Must be 0-39.")
             int_value = 1 if value else 0
-            parts.extend([str(pin), str(int_value)])
+            parts.append(f"{pin} {int_value}")
+        
+        command = f"BATCH_WRITE {' '.join(parts)}"
+        self._send_command(command, expect_response=False)
 
-        self._send_command(" ".join(parts))
+    # I2C Functions
+    def i2c_init(self, sda: int = 21, scl: int = 22, frequency: int = 100000) -> None:
+        """
+        Initialize I2C bus.
+
+        Args:
+            sda: SDA pin number (default: 21)
+            scl: SCL pin number (default: 22)
+            frequency: I2C frequency in Hz (default: 100000)
+
+        Raises:
+            ValueError: If parameters are invalid
+        """
+        if not 0 <= sda < 40:
+            raise ValueError(f"Invalid SDA pin: {sda}. Must be 0-39.")
+        if not 0 <= scl < 40:
+            raise ValueError(f"Invalid SCL pin: {scl}. Must be 0-39.")
+        if not 1000 <= frequency <= 1000000:
+            raise ValueError(f"Invalid frequency: {frequency}. Must be 1000-1000000 Hz.")
+
+        self._send_command(f"I2C_INIT {sda} {scl} {frequency}", expect_response=False)
+        self.i2c_initialized = True
+
+    def i2c_scan(self) -> List[int]:
+        """
+        Scan I2C bus for devices.
+
+        Returns:
+            List of I2C addresses where devices were found
+
+        Raises:
+            RuntimeError: If I2C not initialized
+        """
+        if not self.i2c_initialized:
+            raise RuntimeError("I2C not initialized. Call i2c_init() first.")
+
+        response = self._send_command("I2C_SCAN")
+        if response == "NONE":  # type: ignore[comparison-overlap]
+            return []
+        
+        # Parse response: "0x3C,0x57" -> [60, 87]
+        addresses = []
+        if response:  # type: ignore[truthy-bool]
+            for addr_str in response.split(','):  # type: ignore[union-attr]
+                addr_str = addr_str.strip()
+                if addr_str.startswith('0x'):
+                    addresses.append(int(addr_str, 16))
+                else:
+                    addresses.append(int(addr_str))
+        return addresses
+
+    def i2c_write(self, address: int, data: Union[int, List[int], bytes]) -> None:
+        """
+        Write data to I2C device.
+
+        Args:
+            address: I2C device address (7-bit)
+            data: Single byte, list of bytes, or bytes object to write
+
+        Raises:
+            ValueError: If address or data is invalid
+            RuntimeError: If I2C not initialized
+        """
+        if not self.i2c_initialized:
+            raise RuntimeError("I2C not initialized. Call i2c_init() first.")
+        if not 0x00 <= address <= 0x7F:
+            raise ValueError(f"Invalid I2C address: 0x{address:02X}. Must be 0x00-0x7F.")
+
+        # Convert data to list of bytes
+        if isinstance(data, int):
+            if not 0 <= data <= 255:
+                raise ValueError(f"Invalid byte value: {data}. Must be 0-255.")
+            bytes_list = [data]
+        elif isinstance(data, bytes):
+            bytes_list = list(data)
+        else:
+            bytes_list = data
+
+        if not bytes_list:
+            raise ValueError("Data cannot be empty")
+
+        # Build command: I2C_WRITE <address> <byte1> <byte2> ...
+        cmd = f"I2C_WRITE {address} " + " ".join(str(b) for b in bytes_list)
+        self._send_command(cmd, expect_response=False)
+
+    def i2c_read(self, address: int, num_bytes: int) -> List[int]:
+        """
+        Read data from I2C device.
+
+        Args:
+            address: I2C device address (7-bit)
+            num_bytes: Number of bytes to read
+
+        Returns:
+            List of bytes read from device
+
+        Raises:
+            ValueError: If parameters are invalid
+            RuntimeError: If I2C not initialized
+        """
+        if not self.i2c_initialized:
+            raise RuntimeError("I2C not initialized. Call i2c_init() first.")
+        if not 0x00 <= address <= 0x7F:
+            raise ValueError(f"Invalid I2C address: 0x{address:02X}. Must be 0x00-0x7F.")
+        if not 1 <= num_bytes <= 128:
+            raise ValueError(f"Invalid num_bytes: {num_bytes}. Must be 1-128.")
+
+        response = self._send_command(f"I2C_READ {address} {num_bytes}")
+        
+        # Parse response: "0x12,0x34,0x56" -> [18, 52, 86]
+        if not response or response == "ERROR":  # type: ignore[comparison-overlap]
+            return []
+        
+        bytes_list = []
+        for byte_str in response.split(','):  # type: ignore[union-attr]
+            byte_str = byte_str.strip()
+            if byte_str.startswith('0x'):
+                bytes_list.append(int(byte_str, 16))
+            else:
+                bytes_list.append(int(byte_str))
+        
+        return bytes_list
 
 
 def list_serial_ports() -> List[Tuple[str, str]]:

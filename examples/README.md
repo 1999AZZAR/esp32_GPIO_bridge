@@ -59,7 +59,7 @@ This example demonstrates:
 - Reading from multiple I2C sensors
 - Generic I2C device communication
 
-### Advanced Features Example (NEW in v0.1.3-beta)
+### Advanced Features Example
 
 ```bash
 python advanced_features_example.py
@@ -71,6 +71,136 @@ This example demonstrates:
 - Batch GPIO operations for efficiency
 - String and configuration storage in EEPROM
 - Performance comparison between traditional and batch operations
+
+### PWM Servo Control (NEW in v0.1.3-beta)
+
+```bash
+python pwm_servo_control.py
+```
+
+Hardware needed: 1-2 servo motors connected to GPIO 18 and 19
+
+This example demonstrates:
+- Servo motor control with PWM (50Hz)
+- Smooth angle transitions
+- Preset position control (0°, 45°, 90°, 135°, 180°)
+- Wave patterns and synchronized multi-servo control
+- Angle-to-duty-cycle conversion
+
+### LED Patterns (NEW in v0.1.3-beta)
+
+```bash
+python led_patterns_example.py
+```
+
+Hardware needed: 8 LEDs with resistors on GPIO 2, 4, 5, 12, 13, 14, 15, 16
+
+This example demonstrates:
+- Knight Rider / Cylon scanner effect
+- Binary counter display
+- Chase and wave patterns
+- Alternating blink patterns
+- Random sparkle effect
+- Breathing effect with PWM
+- Batch operations for synchronized LED control
+
+### EEPROM Configuration (NEW in v0.1.3-beta)
+
+```bash
+python eeprom_config_example.py
+```
+
+No additional hardware needed - uses ESP32's internal flash
+
+This example demonstrates:
+- Persistent configuration storage (512 bytes)
+- String storage (device ID, WiFi credentials, timestamps)
+- Integer storage (boot counter, calibration values)
+- JSON configuration serialization
+- Memory map organization
+- Data persistence across power cycles
+- EEPROM clear functionality
+
+### DAC Waveform Generator (NEW in v0.1.3-beta)
+
+```bash
+python dac_waveform_generator.py
+```
+
+Hardware needed: Speaker/amplifier through capacitor (10µF) on GPIO 25/26
+
+This example demonstrates:
+- Sine wave generation (smooth audio tones)
+- Square wave generation (digital signals)
+- Triangle wave generation
+- Sawtooth wave generation
+- Musical note generation (C4-C5 scale)
+- Melody playback
+- Frequency sweep (200Hz - 2000Hz)
+- Dual DAC simultaneous output
+
+### Multi-Sensor Dashboard (NEW in v0.1.3-beta)
+
+```bash
+python multi_sensor_dashboard.py
+```
+
+Hardware needed: 
+- Temperature sensor (analog) on GPIO 34
+- Light sensor (analog) on GPIO 35
+- Moisture sensor (analog) on GPIO 36
+- Motion sensor (PIR) on GPIO 39
+- Status LED on GPIO 2, Buzzer on GPIO 4
+
+This example demonstrates:
+- Real-time monitoring of multiple sensors
+- Statistical analysis (average, min, max, standard deviation)
+- Alert generation with configurable thresholds
+- Visual/audio alert indicators
+- Data logging and history tracking (last 100 readings)
+- Formatted dashboard display
+- Motion detection counting
+
+### Ultrasonic Distance Meter (NEW in v0.1.3-beta)
+
+```bash
+python ultrasonic_distance_meter.py
+```
+
+Hardware needed:
+- HC-SR04 ultrasonic sensor (TRIG: GPIO 5, ECHO: GPIO 18 via voltage divider)
+- Green LED on GPIO 2, Yellow LED on GPIO 4, Red LED on GPIO 12
+- Buzzer on GPIO 13
+
+This example demonstrates:
+- Distance measurement with HC-SR04 sensor (2-400cm range)
+- Real-time distance monitoring (5 readings/second)
+- Visual feedback based on distance zones
+- Proximity alarm with buzzer
+- Statistical analysis (average, min, max, std deviation)
+- Measurement validation and error handling
+- Software-based pulse timing
+
+### Digital Thermometer with Logger (NEW in v0.1.3-beta)
+
+```bash
+python digital_thermometer_logger.py
+```
+
+Hardware needed:
+- TMP36 temperature sensor on GPIO 34
+- Blue LED on GPIO 2, Red LED on GPIO 4
+- Buzzer on GPIO 5
+
+This example demonstrates:
+- TMP36 temperature sensor reading (-40°C to +125°C)
+- Real-time temperature display (Celsius and Fahrenheit)
+- Configurable alert thresholds (high/low temperature)
+- Visual status indicators (blue=normal, red=alert)
+- Statistical analysis with moving average
+- Data logging to memory
+- CSV export functionality
+- Professional formatted output display
 
 ## Troubleshooting
 

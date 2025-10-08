@@ -307,19 +307,20 @@ esp.batch_digital_write({
 
 ```python
 # Initialize I2C bus
-esp.i2c_init(sda_pin, scl_pin)
+esp.i2c_init(sda=21, scl=22, frequency=100000)
 
 # Scan for devices
 devices = esp.i2c_scan()
-# Returns: List of hex addresses as strings
+# Returns: List of I2C addresses as integers [60, 87, ...]
 
-# Write data
-esp.i2c_write(device_addr, data_bytes)
-# device_addr: "0x68", data_bytes: [0x01, 0xFF]
+# Write data to I2C device
+esp.i2c_write(0x3C, [0x00, 0xFF, 0x80])
+# address: I2C device address (7-bit)
+# data: Single byte, list of bytes, or bytes object
 
-# Read data
-data = esp.i2c_read(device_addr, num_bytes)
-# Returns: List of integers
+# Read data from I2C device
+data = esp.i2c_read(0x3C, 4)
+# Returns: List of integers [0x12, 0x34, 0x56, 0x78]
 ```
 
 ### Advanced Features
@@ -467,33 +468,72 @@ cfg.add_custom_preset('my_sensors', {
 
 ## Examples
 
-The `examples/` directory contains comprehensive examples:
+The `examples/` directory contains comprehensive examples demonstrating all features:
 
-### Basic I/O Example
+### Core Examples
 
+**Basic I/O Example** - `basic_io_example.py`
+- Digital input/output (LED, button)
+- Analog input (potentiometer, sensors)
+- DAC output (analog voltage generation)
+
+**Sensor Hub Example** - `sensor_hub_example.py`
+- I2C initialization and device scanning
+- Multi-sensor reading and processing
+- Real-world sensor integration
+
+**Advanced Features Example** - `advanced_features_example.py`
+- PWM control for LED fading
+- EEPROM persistent storage
+- Batch GPIO operations
+- Performance comparison
+
+### Specialized Examples (NEW in v0.1.3-beta)
+
+**PWM Servo Control** - `pwm_servo_control.py`
+- Servo motor control with PWM
+- Smooth angle transitions
+- Multi-servo coordination
+
+**LED Patterns** - `led_patterns_example.py`
+- Creative LED patterns and effects
+- Batch operations for synchronized control
+- Knight Rider, rainbow, and breathing effects
+
+**EEPROM Configuration** - `eeprom_config_example.py`
+- Persistent configuration storage
+- WiFi credentials and settings
+- JSON configuration serialization
+
+**DAC Waveform Generator** - `dac_waveform_generator.py`
+- Sine, square, triangle, and sawtooth waves
+- Audio tone generation
+- Frequency control
+
+**Multi-Sensor Dashboard** - `multi_sensor_dashboard.py`
+- Real-time sensor monitoring
+- Multiple analog sensors
+- Data logging and statistics
+
+**Ultrasonic Distance Meter** - `ultrasonic_distance_meter.py`
+- HC-SR04 distance measurement
+- Visual zone indicators (LEDs)
+- Proximity alarm
+- Statistical analysis
+
+**Digital Thermometer Logger** - `digital_thermometer_logger.py`
+- TMP36 temperature monitoring
+- Real-time display with alerts
+- CSV data export
+- Moving average smoothing
+
+Run any example:
 ```bash
-python examples/basic_io_example.py
+cd examples
+python <example_name>.py
 ```
 
-Demonstrates digital I/O, analog I/O, and LED control.
-
-### Sensor Hub Example
-
-```bash
-python examples/sensor_hub_example.py
-```
-
-Shows I2C sensor integration and multi-device communication.
-
-### Advanced Features Example (NEW in v0.1.3-beta)
-
-```bash
-python examples/advanced_features_example.py
-```
-
-Demonstrates PWM control, EEPROM storage, batch operations, and motor control.
-
-See `examples/README.md` for detailed setup instructions and troubleshooting.
+See `examples/README.md` for detailed setup instructions, wiring diagrams, and troubleshooting.
 
 ## Command Protocol Reference
 

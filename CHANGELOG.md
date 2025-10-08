@@ -64,11 +64,47 @@ All notable changes to the ESP32 GPIO Bridge project will be documented in this 
 - Added retry logic with PING commands (3 attempts) for robust connection
 - Connection now works reliably without user intervention
 - Proper handling of ESP32 bootloader messages
+- **Fixed response queue contamination** - Enhanced filtering system:
+  - Filters out PONG responses from ping thread
+  - Filters out STATUS responses unless explicitly requested
+  - Filters out stale ERROR messages from previous commands
+  - Up to 10 retry attempts to find valid responses
+  - Commands now correctly wait for actual responses, not background noise
+- Firmware version displays correctly (not "PONG" anymore)
+
+### Bug Fixes
+- **Added missing I2C methods** - i2c_init(), i2c_scan(), i2c_read(), i2c_write()
+- Fixed PWM commands receiving STATUS responses instead of channel numbers
+- **Fixed ALL write commands expecting responses** - 11 total commands now correctly use `expect_response=False`:
+  - GPIO: set_pin_mode(), digital_write(), analog_write()
+  - PWM: pwm_write(), pwm_stop()
+  - EEPROM: eeprom_write(), eeprom_write_block(), eeprom_commit(), eeprom_clear()
+  - I2C: i2c_init(), i2c_write()
+  - Batch: batch_digital_write()
+- This eliminates response queue contamination and timeout waits on write operations
+- Breathing pattern in LED example now works correctly
+- sensor_hub_example.py now works correctly
+- advanced_features_example.py now works correctly
+- led_patterns_example.py now works correctly
+- eeprom_config_example.py now works correctly
+
+### New Examples
+- **advanced_features_example.py** - PWM, EEPROM, batch operations, performance comparison
+- **pwm_servo_control.py** - Servo motor control with smooth transitions
+- **led_patterns_example.py** - Creative LED effects (Knight Rider, binary counter, breathing, etc.)
+- **eeprom_config_example.py** - Persistent configuration storage with JSON support
+- **dac_waveform_generator.py** - Audio waveform generation and musical notes
+- **multi_sensor_dashboard.py** - Real-time multi-sensor monitoring with statistics
+- **ultrasonic_distance_meter.py** - HC-SR04 distance measurement with visual feedback
+- **digital_thermometer_logger.py** - Temperature monitoring with CSV export
+
+Total: 10 example scripts (3 original + 7 new)
 
 ### Documentation
 - Added comprehensive API documentation for new features
-- Created `advanced_features_example.py` demonstrating PWM, EEPROM, and batch operations
-- Updated README with detailed usage examples
+- Updated README with all new examples
+- Updated examples/README.md with detailed hardware setup and features
+- Comprehensive CHANGELOG with all improvements and fixes
 - Enhanced examples README with hardware setup instructions
 - Added command protocol reference for new commands
 
