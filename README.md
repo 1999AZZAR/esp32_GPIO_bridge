@@ -819,7 +819,9 @@ esp32-gpio-bridge/
 ├── tests/               # Test suite
 │   ├── __init__.py
 │   └── test_pins.py     # Pin management tests (16 tests)
-├── esp32_GPIO_bridge.ino # ESP32 firmware (v0.1.5-beta, dual-core optimized)
+├── firmware/              # ESP32 firmware source code
+│   ├── firmware.ino      # Main firmware file (v0.1.5-beta, dual-core optimized)
+│   └── README.md         # Firmware code structure and splitting plan
 ├── environment.yml      # Conda environment configuration
 ├── setup.py            # Package installation
 ├── requirements.txt    # Python dependencies (includes types-pyserial)

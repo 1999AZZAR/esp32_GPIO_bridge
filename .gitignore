@@ -13,6 +13,21 @@ ENV/
 env.bak/
 venv.bak/
 
+# Build files
+firmware/bin/
+firmware/build/
+firmware/core/
+firmware/lib/
+firmware/libdeps/
+firmware/lib/libb64/
+firmware/lib/mbedtls/
+firmware/lib/mbedtls/mbedtls/
+firmware/lib/mbedtls/mbedtls/certs/
+firmware/lib/mbedtls/mbedtls/include/
+firmware/lib/mbedtls/mbedtls/library/
+firmware/lib/mbedtls/mbedtls/tests/
+firmware/lib/mbedtls/mbedtls/utils/
+
 # Python bytecode
 __pycache__/
 *.py[cod]

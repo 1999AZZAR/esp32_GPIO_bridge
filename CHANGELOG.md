@@ -36,6 +36,13 @@ All notable changes to the ESP32 GPIO Bridge project will be documented in this 
 - **Pin-to-channel mapping array** provides instant PWM channel lookup
 - **Impact:** Microsecond-level PWM operations, cleaner code architecture
 
+#### Improved Code Organization
+- **Moved firmware to dedicated directory**: `esp32_GPIO_bridge.ino` → `firmware/firmware.ino`
+- **Established modular architecture foundation** for future code splitting
+- **Created comprehensive code splitting plan** with 14 planned modules
+- **Improved coding discipline** and project structure organization
+- **Impact:** Better maintainability, easier development, cleaner project structure
+
 ### Technical Improvements
 
 - **Enhanced serial task architecture** with two-phase processing (parse/queue + batch process)

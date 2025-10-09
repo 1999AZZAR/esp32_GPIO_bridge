@@ -9,21 +9,8 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/semphr.h"
-
-#define FW_VERSION "0.1.5-beta"
-#define BAUD_RATE 115200
-#define SERIAL_RX_BUFFER 1024        // Increased from default 256 for better throughput
-#define SERIAL_TX_BUFFER 1024        // Increased from default 256 for better throughput
-#define CMD_BUFFER_SIZE 256          // Command buffer size for char-based parsing
-#define FAILSAFE_TIMEOUT 10000       // 10 seconds of no commands before warning
-#define FAILSAFE_GRACE_PERIOD 20000  // 20 seconds grace period before engaging failsafe
-#define FAILSAFE_RECOVERY_TIMEOUT 5000 // 5 seconds to recover from failsafe
-#define MAX_PINS 40
-#define DEFAULT_VREF 1100
-#define EEPROM_SIZE 512              // 512 bytes of EEPROM
-#define MAX_PWM_CHANNELS 16
-#define PWM_FREQUENCY 5000
-#define PWM_RESOLUTION 8
+#include "config.h"
+#include "response.h"
 
 unsigned long lastCommandTime = 0;
 unsigned long lastPingTime = 0;
@@ -40,7 +27,6 @@ int cmdIndex = 0;
 bool inCommand = false;
 
 // Command queuing system (v0.1.5-beta optimization)
-#define CMD_QUEUE_SIZE 32
 struct QueuedCommand {
   char command[CMD_BUFFER_SIZE];
   bool valid;
@@ -51,7 +37,6 @@ int queueTail = 0;
 int queueCount = 0;
 
 // Response buffer for efficient serial output (v0.1.5-beta optimization)
-#define RESPONSE_BUFFER_SIZE 512
 char responseBuffer[RESPONSE_BUFFER_SIZE];
 int responseIndex = 0;
 
@@ -97,38 +82,6 @@ bool dequeueCommand(char* cmd) {
   return true;
 }
 
-// Response buffer functions (v0.1.5-beta)
-void clearResponse() {
-  responseIndex = 0;
-  responseBuffer[0] = '\0';
-}
-
-void addToResponse(const char* str) {
-  int len = strlen(str);
-  if (responseIndex + len < RESPONSE_BUFFER_SIZE - 1) {
-    strcpy(responseBuffer + responseIndex, str);
-    responseIndex += len;
-  }
-}
-
-void addToResponse(int value) {
-  char temp[16];
-  sprintf(temp, "%d", value);
-  addToResponse(temp);
-}
-
-void addToResponse(unsigned long value) {
-  char temp[16];
-  sprintf(temp, "%lu", value);
-  addToResponse(temp);
-}
-
-void sendResponse() {
-  if (responseIndex > 0) {
-    Serial.println(responseBuffer);
-    clearResponse();
-  }
-}
 
 void setup() {
   // Disable WiFi to save power and resources
