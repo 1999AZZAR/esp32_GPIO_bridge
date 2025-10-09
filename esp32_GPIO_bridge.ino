@@ -6,8 +6,11 @@
 #include "esp_wifi.h"
 #include "esp_bt.h"
 #include "esp_bt_main.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "freertos/semphr.h"
 
-#define FW_VERSION "0.1.4-beta"
+#define FW_VERSION "0.1.5-beta"
 #define BAUD_RATE 115200
 #define SERIAL_RX_BUFFER 1024        // Increased from default 256 for better throughput
 #define SERIAL_TX_BUFFER 1024        // Increased from default 256 for better throughput
@@ -45,6 +48,14 @@ struct PWMChannel {
 PWMChannel pwmChannels[MAX_PWM_CHANNELS];
 int nextPWMChannel = 0;
 
+// O(1) PWM channel lookup optimization (v0.1.5-beta)
+int8_t pinToPWMChannel[MAX_PINS];  // -1 = unused
+
+// FreeRTOS task handles
+TaskHandle_t serialTaskHandle;
+TaskHandle_t failsafeTaskHandle;
+SemaphoreHandle_t sharedDataMutex;
+
 void setup() {
   // Disable WiFi to save power and resources
   esp_wifi_stop();
@@ -75,6 +86,11 @@ void setup() {
     pwmChannels[i].active = false;
   }
   
+  // Initialize PWM channel lookup mapping (v0.1.5-beta optimization)
+  for (int i = 0; i < MAX_PINS; i++) {
+    pinToPWMChannel[i] = -1;  // -1 = unused
+  }
+  
   // Wait for serial to stabilize and flush any boot garbage
   delay(1000);
   while(Serial.available()) {
@@ -91,54 +107,104 @@ void setup() {
   
   lastCommandTime = millis();
   lastPingTime = millis();
+  
+  // Create mutex for shared data protection (v0.1.5-beta)
+  sharedDataMutex = xSemaphoreCreateMutex();
+  if (sharedDataMutex == NULL) {
+    Serial.println("<ERROR:Failed to create mutex>");
+    return;
+  }
+  
+  // Create FreeRTOS tasks (v0.1.5-beta)
+  xTaskCreatePinnedToCore(
+    serialTask,           // Task function
+    "SerialTask",         // Task name
+    4096,                 // Stack size
+    NULL,                 // Parameters
+    2,                    // Priority (high for responsiveness)
+    &serialTaskHandle,    // Task handle
+    0                     // Core 0 (protocol CPU)
+  );
+  
+  xTaskCreatePinnedToCore(
+    failsafeTask,         // Task function
+    "FailsafeTask",       // Task name
+    2048,                 // Stack size
+    NULL,                 // Parameters
+    1,                    // Priority (lower than serial)
+    &failsafeTaskHandle,  // Task handle
+    1                     // Core 1 (application CPU)
+  );
+  
+  Serial.println("<INFO:FreeRTOS tasks initialized - Dual-core operation enabled>");
+}
+
+// FreeRTOS Tasks (v0.1.5-beta)
+void serialTask(void* parameter) {
+  while (true) {
+    // Optimized char-based command parsing (v0.1.4 - replaces String for better performance)
+    while (Serial.available()) {
+      char c = Serial.read();
+      
+      if (c == '<') {
+        // Start of command
+        cmdIndex = 0;
+        inCommand = true;
+      }
+      else if (c == '>' && inCommand) {
+        // End of command - process it
+        cmdBuffer[cmdIndex] = '\0';  // Null terminate
+        
+        // Protect shared data access
+        if (xSemaphoreTake(sharedDataMutex, portMAX_DELAY) == pdTRUE) {
+          processCommand(cmdBuffer);
+          lastCommandTime = millis();
+          lastPingTime = millis(); // Update ping time on any command
+
+          // Reset failsafe states when communication resumes
+          if (failsafeEngaged) {
+            Serial.println("<INFO:Failsafe disengaged - Communication restored>");
+            disengageFailsafe();
+          }
+          failsafeWarningSent = false;
+          xSemaphoreGive(sharedDataMutex);
+        }
+        
+        inCommand = false;
+      }
+      else if (inCommand && cmdIndex < CMD_BUFFER_SIZE - 1) {
+        // Build command buffer
+        cmdBuffer[cmdIndex++] = c;
+      }
+      else if (cmdIndex >= CMD_BUFFER_SIZE - 1) {
+        // Buffer overflow protection
+        inCommand = false;
+        cmdIndex = 0;
+        Serial.println("<ERROR:Command too long>");
+      }
+    }
+    vTaskDelay(1 / portTICK_PERIOD_MS);  // Yield to other tasks
+  }
+}
+
+void failsafeTask(void* parameter) {
+  while (true) {
+    unsigned long currentTime = millis();
+    
+    // Protect shared data access
+    if (xSemaphoreTake(sharedDataMutex, portMAX_DELAY) == pdTRUE) {
+      checkFailsafe(currentTime);
+      xSemaphoreGive(sharedDataMutex);
+    }
+    
+    vTaskDelay(1000 / portTICK_PERIOD_MS);  // Check every 1 second
+  }
 }
 
 void loop() {
-  unsigned long currentTime = millis();
-  static unsigned long lastFailsafeCheck = 0;  // v0.1.4 optimization: check failsafe only once per second
-
-  // Optimized char-based command parsing (v0.1.4 - replaces String for better performance)
-  while (Serial.available()) {
-    char c = Serial.read();
-    
-    if (c == '<') {
-      // Start of command
-      cmdIndex = 0;
-      inCommand = true;
-    }
-    else if (c == '>' && inCommand) {
-      // End of command - process it
-      cmdBuffer[cmdIndex] = '\0';  // Null terminate
-      processCommand(cmdBuffer);
-      inCommand = false;
-      lastCommandTime = currentTime;
-      lastPingTime = currentTime; // Update ping time on any command
-
-      // Reset failsafe states when communication resumes
-      if (failsafeEngaged) {
-        Serial.println("<INFO:Failsafe disengaged - Communication restored>");
-        disengageFailsafe();
-      }
-      failsafeWarningSent = false;
-    }
-    else if (inCommand && cmdIndex < CMD_BUFFER_SIZE - 1) {
-      // Build command buffer
-      cmdBuffer[cmdIndex++] = c;
-    }
-    else if (cmdIndex >= CMD_BUFFER_SIZE - 1) {
-      // Buffer overflow protection
-      inCommand = false;
-      cmdIndex = 0;
-      Serial.println("<ERROR:Command too long>");
-    }
-  }
-
-  // Optimization 1.3: Check failsafe only once per second (99% less CPU usage)
-  // Instead of checking every loop iteration (~10,000x per second), check once per second
-  if (currentTime - lastFailsafeCheck >= 1000) {
-    checkFailsafe(currentTime);
-    lastFailsafeCheck = currentTime;
-  }
+  // Main loop is now minimal - just wait for tasks to complete
+  // All actual work is done by FreeRTOS tasks (v0.1.5-beta)
+  vTaskDelay(portMAX_DELAY);
 }
 
 void checkFailsafe(unsigned long currentTime) {
@@ -471,13 +537,10 @@ void handleI2SWrite(String parts[], int partCount) {
 }
 
 // PWM Functions
+// O(1) PWM channel lookup optimization (v0.1.5-beta)
 int findPWMChannel(int pin) {
-    for (int i = 0; i < MAX_PWM_CHANNELS; i++) {
-        if (pwmChannels[i].active && pwmChannels[i].pin == pin) {
-            return i;
-        }
-    }
-    return -1;
+    if (pin < 0 || pin >= MAX_PINS) return -1;
+    return pinToPWMChannel[pin];
 }
 
 int allocatePWMChannel(int pin) {
@@ -492,6 +555,7 @@ int allocatePWMChannel(int pin) {
         if (!pwmChannels[i].active) {
             pwmChannels[i].pin = pin;
             pwmChannels[i].active = true;
+            pinToPWMChannel[pin] = i;  // Update O(1) mapping (v0.1.5-beta)
             return i;
         }
     }
@@ -595,6 +659,7 @@ void handlePWMStop(String pinStr) {
     
     pwmChannels[channel].active = false;
     pwmChannels[channel].pin = -1;
+    pinToPWMChannel[pin] = -1;  // Clear O(1) mapping (v0.1.5-beta)
     // OK response removed (v0.1.4 optimization)
 }
 
