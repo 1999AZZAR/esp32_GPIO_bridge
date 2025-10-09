@@ -39,6 +39,22 @@ char cmdBuffer[CMD_BUFFER_SIZE];
 int cmdIndex = 0;
 bool inCommand = false;
 
+// Command queuing system (v0.1.5-beta optimization)
+#define CMD_QUEUE_SIZE 32
+struct QueuedCommand {
+  char command[CMD_BUFFER_SIZE];
+  bool valid;
+};
+QueuedCommand cmdQueue[CMD_QUEUE_SIZE];
+int queueHead = 0;
+int queueTail = 0;
+int queueCount = 0;
+
+// Response buffer for efficient serial output (v0.1.5-beta optimization)
+#define RESPONSE_BUFFER_SIZE 512
+char responseBuffer[RESPONSE_BUFFER_SIZE];
+int responseIndex = 0;
+
 // PWM management
 struct PWMChannel {
   int pin;
@@ -55,6 +71,64 @@ int8_t pinToPWMChannel[MAX_PINS];  // -1 = unused
 TaskHandle_t serialTaskHandle;
 TaskHandle_t failsafeTaskHandle;
 SemaphoreHandle_t sharedDataMutex;
+
+// Queue management functions (v0.1.5-beta)
+bool enqueueCommand(const char* cmd) {
+  if (queueCount >= CMD_QUEUE_SIZE) return false;  // Queue full
+  
+  strncpy(cmdQueue[queueTail].command, cmd, CMD_BUFFER_SIZE - 1);
+  cmdQueue[queueTail].command[CMD_BUFFER_SIZE - 1] = '\0';
+  cmdQueue[queueTail].valid = true;
+  
+  queueTail = (queueTail + 1) % CMD_QUEUE_SIZE;
+  queueCount++;
+  return true;
+}
+
+bool dequeueCommand(char* cmd) {
+  if (queueCount == 0) return false;  // Queue empty
+  
+  strncpy(cmd, cmdQueue[queueHead].command, CMD_BUFFER_SIZE - 1);
+  cmd[CMD_BUFFER_SIZE - 1] = '\0';
+  cmdQueue[queueHead].valid = false;
+  
+  queueHead = (queueHead + 1) % CMD_QUEUE_SIZE;
+  queueCount--;
+  return true;
+}
+
+// Response buffer functions (v0.1.5-beta)
+void clearResponse() {
+  responseIndex = 0;
+  responseBuffer[0] = '\0';
+}
+
+void addToResponse(const char* str) {
+  int len = strlen(str);
+  if (responseIndex + len < RESPONSE_BUFFER_SIZE - 1) {
+    strcpy(responseBuffer + responseIndex, str);
+    responseIndex += len;
+  }
+}
+
+void addToResponse(int value) {
+  char temp[16];
+  sprintf(temp, "%d", value);
+  addToResponse(temp);
+}
+
+void addToResponse(unsigned long value) {
+  char temp[16];
+  sprintf(temp, "%lu", value);
+  addToResponse(temp);
+}
+
+void sendResponse() {
+  if (responseIndex > 0) {
+    Serial.println(responseBuffer);
+    clearResponse();
+  }
+}
 
 void setup() {
   // Disable WiFi to save power and resources
@@ -90,6 +164,18 @@ void setup() {
   for (int i = 0; i < MAX_PINS; i++) {
     pinToPWMChannel[i] = -1;  // -1 = unused
   }
+  
+  // Initialize command queue (v0.1.5-beta optimization)
+  for (int i = 0; i < CMD_QUEUE_SIZE; i++) {
+    cmdQueue[i].valid = false;
+    cmdQueue[i].command[0] = '\0';
+  }
+  queueHead = 0;
+  queueTail = 0;
+  queueCount = 0;
+  
+  // Initialize response buffer (v0.1.5-beta optimization)
+  clearResponse();
   
   // Wait for serial to stabilize and flush any boot garbage
   delay(1000);
@@ -142,7 +228,7 @@ void setup() {
 // FreeRTOS Tasks (v0.1.5-beta)
 void serialTask(void* parameter) {
   while (true) {
-    // Optimized char-based command parsing (v0.1.4 - replaces String for better performance)
+    // Phase 1: Parse and queue incoming commands
     while (Serial.available()) {
       char c = Serial.read();
       
@@ -152,22 +238,17 @@ void serialTask(void* parameter) {
         inCommand = true;
       }
       else if (c == '>' && inCommand) {
-        // End of command - process it
+        // End of command - queue it for processing
         cmdBuffer[cmdIndex] = '\0';  // Null terminate
         
-        // Protect shared data access
-        if (xSemaphoreTake(sharedDataMutex, portMAX_DELAY) == pdTRUE) {
-          processCommand(cmdBuffer);
-          lastCommandTime = millis();
-          lastPingTime = millis(); // Update ping time on any command
-
-          // Reset failsafe states when communication resumes
-          if (failsafeEngaged) {
-            Serial.println("<INFO:Failsafe disengaged - Communication restored>");
-            disengageFailsafe();
+        // Enqueue command for batch processing
+        if (!enqueueCommand(cmdBuffer)) {
+          // Queue full - process immediately
+          if (xSemaphoreTake(sharedDataMutex, portMAX_DELAY) == pdTRUE) {
+            processCommand(cmdBuffer);
+            updateCommandTimestamps();
+            xSemaphoreGive(sharedDataMutex);
           }
-          failsafeWarningSent = false;
-          xSemaphoreGive(sharedDataMutex);
         }
         
         inCommand = false;
@@ -183,8 +264,38 @@ void serialTask(void* parameter) {
         Serial.println("<ERROR:Command too long>");
       }
     }
+    
+    // Phase 2: Process queued commands in batch
+    if (queueCount > 0) {
+      if (xSemaphoreTake(sharedDataMutex, portMAX_DELAY) == pdTRUE) {
+        // Process up to 5 commands per batch for optimal throughput
+        int batchSize = min(queueCount, 5);
+        for (int i = 0; i < batchSize; i++) {
+          char queuedCmd[CMD_BUFFER_SIZE];
+          if (dequeueCommand(queuedCmd)) {
+            processCommand(queuedCmd);
+          }
+        }
+        updateCommandTimestamps();
+        xSemaphoreGive(sharedDataMutex);
+      }
+    }
+    
     vTaskDelay(1 / portTICK_PERIOD_MS);  // Yield to other tasks
   }
+}
+
+// Helper function to update command timestamps (v0.1.5-beta)
+void updateCommandTimestamps() {
+  lastCommandTime = millis();
+  lastPingTime = millis();
+  
+  // Reset failsafe states when communication resumes
+  if (failsafeEngaged) {
+    Serial.println("<INFO:Failsafe disengaged - Communication restored>");
+    disengageFailsafe();
+  }
+  failsafeWarningSent = false;
 }
 
 void failsafeTask(void* parameter) {
@@ -285,25 +396,35 @@ void processCommand(char* cmd) {
     for (char* p = action; *p; p++) *p = toupper(*p);
 
     if (strcmp(action, "PING") == 0) {
-        Serial.println("<PONG>");
+        clearResponse();
+        addToResponse("<PONG>");
+        sendResponse();
         lastPingTime = millis(); // Update ping time for failsafe detection
     }
     else if (strcmp(action, "IDENTIFY") == 0) {
-        Serial.print("<ESP32_GPIO_BRIDGE:");
-        Serial.print(FW_VERSION);
-        Serial.println(">");
+        clearResponse();
+        addToResponse("<ESP32_GPIO_BRIDGE:");
+        addToResponse(FW_VERSION);
+        addToResponse(">");
+        sendResponse();
     }
     else if (strcmp(action, "VERSION") == 0) {
-        Serial.print("<"); Serial.print(FW_VERSION); Serial.println(">");
+        clearResponse();
+        addToResponse("<");
+        addToResponse(FW_VERSION);
+        addToResponse(">");
+        sendResponse();
     }
     else if (strcmp(action, "STATUS") == 0) {
-        Serial.print("<STATUS:");
-        Serial.print(failsafeEngaged ? "FAILSAFE" : "NORMAL");
-        Serial.print(",");
-        Serial.print(millis() - lastCommandTime);
-        Serial.print(",");
-        Serial.print(millis() - lastPingTime);
-        Serial.println(">");
+        clearResponse();
+        addToResponse("<STATUS:");
+        addToResponse(failsafeEngaged ? "FAILSAFE" : "NORMAL");
+        addToResponse(",");
+        addToResponse(millis() - lastCommandTime);
+        addToResponse(",");
+        addToResponse(millis() - lastPingTime);
+        addToResponse(">");
+        sendResponse();
     }
     else if (strcmp(action, "RESET_FAILSAFE") == 0 || strcmp(action, "CLEAR_FAILSAFE") == 0 || strcmp(action, "DISABLE_FAILSAFE") == 0) {
         if (failsafeEngaged) {
@@ -400,8 +521,17 @@ void handleDigitalWrite(String pinStr, String valStr) {
 
 void handleDigitalRead(String pinStr) {
     int pin = pinStr.toInt();
-    if (!isValidPin(pin)) { Serial.println("<ERROR:Invalid pin>"); return; }
-    Serial.print("<"); Serial.print(digitalRead(pin)); Serial.println(">");
+    if (!isValidPin(pin)) { 
+        clearResponse();
+        addToResponse("<ERROR:Invalid pin>");
+        sendResponse();
+        return; 
+    }
+    clearResponse();
+    addToResponse("<");
+    addToResponse(digitalRead(pin));
+    addToResponse(">");
+    sendResponse();
 }
 
 void initADC() {
@@ -429,11 +559,18 @@ adc1_channel_t getADC1Channel(int pin) {
 
 void handleAnalogRead(String pinStr) {
     int pin = pinStr.toInt();
-    if (!isValidPin(pin)) { Serial.println("<ERROR:Invalid pin>"); return; }
+    if (!isValidPin(pin)) { 
+        clearResponse();
+        addToResponse("<ERROR:Invalid pin>");
+        sendResponse();
+        return; 
+    }
     
     adc1_channel_t channel = getADC1Channel(pin);
     if (channel == ADC1_CHANNEL_MAX) {
-        Serial.println("<ERROR:Pin is not a valid ADC pin>");
+        clearResponse();
+        addToResponse("<ERROR:Pin is not a valid ADC pin>");
+        sendResponse();
         return;
     }
     
@@ -441,7 +578,11 @@ void handleAnalogRead(String pinStr) {
     adc1_config_channel_atten(channel, ADC_ATTEN_DB_11);
     
     int raw = adc1_get_raw(channel);
-    Serial.print("<"); Serial.print(raw); Serial.println(">");
+    clearResponse();
+    addToResponse("<");
+    addToResponse(raw);
+    addToResponse(">");
+    sendResponse();
 }
 
 void handleAnalogWrite(String pinStr, String valStr) {
@@ -466,15 +607,23 @@ void handleI2CInit(String sdaStr, String sclStr) {
 }
 
 void handleI2CScan() {
-    String found = "";
+    clearResponse();
+    addToResponse("<");
+    
+    bool first = true;
     for (byte address = 1; address < 127; address++) {
         Wire.beginTransmission(address);
         if (Wire.endTransmission() == 0) {
-            found += "0x" + String(address, HEX) + " ";
+            if (!first) addToResponse(" ");
+            addToResponse("0x");
+            char hexStr[4];
+            sprintf(hexStr, "%02X", address);
+            addToResponse(hexStr);
+            first = false;
         }
     }
-    found.trim();
-    Serial.print("<"); Serial.print(found); Serial.println(">");
+    addToResponse(">");
+    sendResponse();
 }
 
 void handleI2CWrite(String addrStr, String parts[], int partCount) {
@@ -494,12 +643,20 @@ void handleI2CRead(String addrStr, String lenStr) {
     byte addr = strtol(addrStr.c_str(), NULL, 16);
     int len = lenStr.toInt();
     Wire.requestFrom(addr, (byte)len);
-    String data = "";
+    
+    clearResponse();
+    addToResponse("<");
+    
+    bool first = true;
     while (Wire.available()) {
-        data += String(Wire.read(), HEX) + " ";
+        if (!first) addToResponse(" ");
+        char hexStr[4];
+        sprintf(hexStr, "%02X", Wire.read());
+        addToResponse(hexStr);
+        first = false;
     }
-    data.trim();
-    Serial.print("<"); Serial.print(data); Serial.println(">");
+    addToResponse(">");
+    sendResponse();
 }
 
 void handleI2SInitTx(String bckStr, String wsStr, String dataStr, String rateStr) {
@@ -605,9 +762,11 @@ void handlePWMInit(String pinStr, String freqStr, String resStr) {
     trackPin(pin);
     outputCommandsSent = true;  // PWM output - enable failsafe
     
-    Serial.print("<");
-    Serial.print(channel);
-    Serial.println(">");
+    clearResponse();
+    addToResponse("<");
+    addToResponse(channel);
+    addToResponse(">");
+    sendResponse();
 }
 
 void handlePWMWrite(String pinStr, String dutyStr) {
@@ -668,14 +827,18 @@ void handleEEPROMRead(String addrStr) {
     int addr = addrStr.toInt();
     
     if (addr < 0 || addr >= EEPROM_SIZE) {
-        Serial.println("<ERROR:Address out of range>");
+        clearResponse();
+        addToResponse("<ERROR:Address out of range>");
+        sendResponse();
         return;
     }
     
     byte value = EEPROM.read(addr);
-    Serial.print("<");
-    Serial.print(value);
-    Serial.println(">");
+    clearResponse();
+    addToResponse("<");
+    addToResponse((int)value);
+    addToResponse(">");
+    sendResponse();
 }
 
 void handleEEPROMWrite(String addrStr, String valStr) {

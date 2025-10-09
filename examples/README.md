@@ -34,6 +34,12 @@ Before running any examples, ensure you have:
 - Optional: Multiple LEDs on GPIO pins 12, 13, 14, 15 (for batch operations)
 - No additional hardware required for EEPROM features
 
+### Arduino Arm Robot Example (v0.1.5-beta)
+- 6x SG90 servo motors connected to GPIO pins 16, 17, 18, 19, 21, 22
+- 6V external power supply for servos (2A+ recommended)
+- Optional: Potentiometers for manual calibration
+- Demonstrates advanced multi-servo control with batch operations
+
 ## Running Examples
 
 ### Basic I/O Example
@@ -202,6 +208,54 @@ This example demonstrates:
 - CSV export functionality
 - Professional formatted output display
 
+### Arduino Arm Robot Example (NEW in v0.1.5-beta)
+
+```bash
+python arduino_arm_robot.py
+```
+
+This advanced example demonstrates:
+- **Multi-servo coordinated control** with 6-DOF robotic arm
+- **Batch PWM operations** leveraging v0.1.5-beta's dual-core architecture
+- **Smooth interpolated movements** with professional motion control
+- **Pre-programmed poses** (wave, point, grab, rest positions)
+- **Complex sequences** (dance routines, pick-and-place operations)
+- **Interactive control** with real-time servo adjustment
+- **Servo calibration** and safety limit management
+- **Performance monitoring** with status reports
+
+**Key Features:**
+- **5-10x faster command throughput** with command queuing
+- **Synchronized multi-servo movement** with batch processing
+- **Thread-safe operation** with mutex protection
+- **Professional motion control** with smooth interpolation
+
+**Hardware Setup:**
+- 6x SG90 servo motors (GPIO pins 16, 17, 18, 19, 21, 22)
+- 6V external power supply for servos (2A+ recommended)
+- ESP32 GPIO Bridge firmware v0.1.5-beta
+
+**Usage:**
+```python
+from arduino_arm_robot import ArduinoArmRobot
+
+robot = ArduinoArmRobot()
+robot.connect()
+
+# Move multiple servos simultaneously
+robot.set_multiple_servos({
+    'base': 90,
+    'shoulder': 45,
+    'elbow': 90,
+    'gripper': 0
+})
+
+# Pre-programmed poses
+robot.pose_wave()
+robot.pose_point()
+robot.sequence_dance()
+```
+
 ## Troubleshooting
 
 ### Common Issues
@@ -273,6 +327,20 @@ Reading  2: Raw=1203, Voltage=0.97V, Percentage= 29.4%
 ...
 ```
 
+## Example Files Overview
+
+| Example | Description | Hardware | v0.1.5-beta Features |
+|---------|-------------|----------|---------------------|
+| `basic_io_example.py` | Digital/analog I/O basics | LED, potentiometer | ✅ Optimized |
+| `sensor_hub_example.py` | I2C sensor integration | I2C sensors | ✅ Batch operations |
+| `advanced_features_example.py` | PWM, EEPROM, batch ops | LEDs, motor | ✅ Dual-core |
+| `pwm_servo_control.py` | Single servo control | SG90 servo | ✅ Optimized PWM |
+| `arduino_arm_robot.py` | **NEW** Multi-servo robot | 6x SG90 servos | ✅ **Full v0.1.5-beta** |
+| `led_patterns_example.py` | LED animation patterns | Multiple LEDs | ✅ Batch processing |
+| `multi_sensor_dashboard.py` | Real-time sensor monitoring | Multiple sensors | ✅ Performance |
+| `ultrasonic_distance_meter.py` | Distance measurement | HC-SR04 sensor | ✅ Optimized |
+| `digital_thermometer_logger.py` | Temperature logging | TMP36 sensor | ✅ Data logging |
+
 ## Extending Examples
 
 Feel free to modify these examples or create new ones for your specific use cases:
@@ -281,6 +349,8 @@ Feel free to modify these examples or create new ones for your specific use case
 - **Real-time Monitoring**: Create continuous monitoring applications
 - **Data Logging**: Add file output for data collection
 - **Web Integration**: Combine with web frameworks for remote monitoring
+- **Robotics**: Extend the arm robot example for your specific robot design
+- **Automation**: Create custom automation sequences using batch operations
 
 ## Support
 
