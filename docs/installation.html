@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Installation Guide - ESP32 GPIO Bridge</title>
+    <meta name="description" content="Complete installation guide for ESP32 GPIO Bridge. Step-by-step instructions for firmware setup and Python library installation.">
+    
+    <!-- TailwindCSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Custom Styles -->
+    <style>
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .code-block {
+            background: #1e293b;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+        }
+        .step-card {
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .step-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+        }
+        .nav-link {
+            transition: color 0.3s ease;
+        }
+        .nav-link:hover {
+            color: #3b82f6;
+        }
+        .prerequisite-item {
+            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+            border-left: 4px solid #0ea5e9;
+        }
+        .warning-box {
+            background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+            border-left: 4px solid #f59e0b;
+        }
+        .success-box {
+            background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
+            border-left: 4px solid #22c55e;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-900">
+    <!-- Navigation -->
+    <nav class="bg-white shadow-lg sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <a href="index.html" class="text-2xl font-bold text-blue-600">
+                            <i class="fas fa-microchip mr-2"></i>ESP32 GPIO Bridge
+                        </a>
+                    </div>
+                </div>
+                <div class="hidden md:block">
+                    <div class="ml-10 flex items-baseline space-x-8">
+                        <a href="index.html" class="nav-link text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium">Home</a>
+                        <a href="features.html" class="nav-link text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium">Features</a>
+                        <a href="examples.html" class="nav-link text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium">Examples</a>
+                        <a href="api.html" class="nav-link text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium">API</a>
+                        <a href="installation.html" class="nav-link text-blue-600 px-3 py-2 text-sm font-medium">Installation</a>
+                        <a href="performance.html" class="nav-link text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium">Performance</a>
+                        <a href="architecture.html" class="nav-link text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium">Architecture</a>
+                    </div>
+                </div>
+                <div class="md:hidden">
+                    <button id="mobile-menu-btn" class="text-gray-700 hover:text-blue-600">
+                        <i class="fas fa-bars text-xl"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+        <!-- Mobile menu -->
+        <div id="mobile-menu" class="md:hidden hidden bg-white border-t">
+            <div class="px-2 pt-2 pb-3 space-y-1">
+                <a href="index.html" class="nav-link block px-3 py-2 text-gray-700 hover:text-blue-600">Home</a>
+                <a href="features.html" class="nav-link block px-3 py-2 text-gray-700 hover:text-blue-600">Features</a>
+                <a href="examples.html" class="nav-link block px-3 py-2 text-gray-700 hover:text-blue-600">Examples</a>
+                <a href="api.html" class="nav-link block px-3 py-2 text-gray-700 hover:text-blue-600">API</a>
+                <a href="installation.html" class="nav-link block px-3 py-2 text-blue-600">Installation</a>
+                <a href="performance.html" class="nav-link block px-3 py-2 text-gray-700 hover:text-blue-600">Performance</a>
+                <a href="architecture.html" class="nav-link block px-3 py-2 text-gray-700 hover:text-blue-600">Architecture</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="gradient-bg text-white py-16">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <h1 class="text-4xl md:text-5xl font-bold mb-6">Installation Guide</h1>
+            <p class="text-xl text-blue-100 max-w-3xl mx-auto">
+                Get up and running with ESP32 GPIO Bridge in minutes. Complete setup instructions for both firmware and Python library.
+            </p>
+        </div>
+    </section>
+
+    <!-- Quick Navigation -->
+    <section class="bg-white py-8 border-b">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex flex-wrap justify-center gap-4">
+                <a href="#prerequisites" class="bg-blue-100 text-blue-700 px-4 py-2 rounded-lg hover:bg-blue-200 transition-colors">
+                    <i class="fas fa-list-check mr-2"></i>Prerequisites
+                </a>
+                <a href="#firmware" class="bg-green-100 text-green-700 px-4 py-2 rounded-lg hover:bg-green-200 transition-colors">
+                    <i class="fas fa-microchip mr-2"></i>Firmware Setup
+                </a>
+                <a href="#python" class="bg-purple-100 text-purple-700 px-4 py-2 rounded-lg hover:bg-purple-200 transition-colors">
+                    <i class="fab fa-python mr-2"></i>Python Library
+                </a>
+                <a href="#testing" class="bg-orange-100 text-orange-700 px-4 py-2 rounded-lg hover:bg-orange-200 transition-colors">
+                    <i class="fas fa-vial mr-2"></i>Testing
+                </a>
+                <a href="#troubleshooting" class="bg-red-100 text-red-700 px-4 py-2 rounded-lg hover:bg-red-200 transition-colors">
+                    <i class="fas fa-wrench mr-2"></i>Troubleshooting
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Prerequisites -->
+    <section id="prerequisites" class="py-20 bg-white">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <h2 class="text-4xl font-bold text-gray-900 mb-8">Prerequisites</h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-12">
+                <div class="prerequisite-item p-6 rounded-lg">
+                    <div class="flex items-center mb-4">
+                        <div class="bg-blue-100 text-blue-600 rounded-full w-10 h-10 flex items-center justify-center mr-3">
+                            <i class="fas fa-microchip"></i>
+                        </div>
+                        <h3 class="text-lg font-semibold">ESP32 Board</h3>
+                    </div>
+                    <p class="text-gray-700 text-sm">Any ESP32 development board (ESP32-DevKitC, NodeMCU-32S, etc.)</p>
+                </div>
+                
+                <div class="prerequisite-item p-6 rounded-lg">
+                    <div class="flex items-center mb-4">
+                        <div class="bg-green-100 text-green-600 rounded-full w-10 h-10 flex items-center justify-center mr-3">
+                            <i class="fas fa-code"></i>
+                        </div>
+                        <h3 class="text-lg font-semibold">Arduino IDE</h3>
+                    </div>
+                    <p class="text-gray-700 text-sm">Version 2.0.0 or higher with ESP32 board manager</p>
+                </div>
+                
+                <div class="prerequisite-item p-6 rounded-lg">
+                    <div class="flex items-center mb-4">
+                        <div class="bg-purple-100 text-purple-600 rounded-full w-10 h-10 flex items-center justify-center mr-3">
+                            <i class="fab fa-python"></i>
+                        </div>
+                        <h3 class="text-lg font-semibold">Python 3.6+</h3>
+                    </div>
+                    <p class="text-gray-700 text-sm">Python 3.6 or higher installed on your system</p>
+                </div>
+                
+                <div class="prerequisite-item p-6 rounded-lg">
+                    <div class="flex items-center mb-4">
+                        <div class="bg-orange-100 text-orange-600 rounded-full w-10 h-10 flex items-center justify-center mr-3">
+                            <i class="fas fa-usb"></i>
+                        </div>
+                        <h3 class="text-lg font-semibold">USB Cable</h3>
+                    </div>
+                    <p class="text-gray-700 text-sm">USB-A to USB-C or micro-USB cable for ESP32</p>
+                </div>
+                
+                <div class="prerequisite-item p-6 rounded-lg">
+                    <div class="flex items-center mb-4">
+                        <div class="bg-red-100 text-red-600 rounded-full w-10 h-10 flex items-center justify-center mr-3">
+                            <i class="fas fa-desktop"></i>
+                        </div>
+                        <h3 class="text-lg font-semibold">Computer</h3>
+                    </div>
+                    <p class="text-gray-700 text-sm">Windows, macOS, or Linux with USB serial support</p>
+                </div>
+                
+                <div class="prerequisite-item p-6 rounded-lg">
+                    <div class="flex items-center mb-4">
+                        <div class="bg-indigo-100 text-indigo-600 rounded-full w-10 h-10 flex items-center justify-center mr-3">
+                            <i class="fas fa-download"></i>
+                        </div>
+                        <h3 class="text-lg font-semibold">Git</h3>
+                    </div>
+                    <p class="text-gray-700 text-sm">Git installed for cloning the repository</p>
+                </div>
+            </div>
+
+            <div class="warning-box p-6 rounded-lg">
+                <div class="flex items-start">
+                    <i class="fas fa-exclamation-triangle text-yellow-600 text-xl mr-3 mt-1"></i>
+                    <div>
+                        <h3 class="text-lg font-semibold text-yellow-800 mb-2">Important Notes</h3>
+                        <ul class="text-yellow-700 space-y-1 text-sm">
+                            <li>• Make sure your ESP32 board has sufficient GPIO pins (most boards have 30+ GPIO pins)</li>
+                            <li>• Some ESP32 boards may require specific drivers (CP2102, CH340, etc.)</li>
+                            <li>• Ensure your Python environment has pip package manager</li>
+                            <li>• For Linux/Mac users, you may need to add your user to the dialout group</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Firmware Setup -->
+    <section id="firmware" class="py-20 bg-gray-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <h2 class="text-4xl font-bold text-gray-900 mb-8">ESP32 Firmware Setup</h2>
+            <p class="text-xl text-gray-600 mb-12">Flash the modular ESP32 firmware to enable GPIO Bridge functionality.</p>
+            
+            <div class="space-y-8">
+                <!-- Step 1 -->
+                <div class="step-card bg-white p-8 rounded-xl shadow-lg border border-gray-200">
+                    <div class="flex items-center mb-6">
+                        <div class="bg-blue-100 text-blue-600 rounded-full w-12 h-12 flex items-center justify-center mr-4 font-bold text-lg">1</div>
+                        <h3 class="text-2xl font-semibold">Install Arduino IDE & ESP32 Board Package</h3>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        <div>
+                            <h4 class="font-semibold mb-4">Download Arduino IDE</h4>
+                            <p class="text-gray-600 mb-4">Download and install Arduino IDE version 2.0.0 or higher from the official website.</p>
+                            <a href="https://www.arduino.cc/en/software" target="_blank" class="inline-flex items-center bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+                                <i class="fas fa-external-link-alt mr-2"></i>Download Arduino IDE
+                            </a>
+                        </div>
+                        
+                        <div>
+                            <h4 class="font-semibold mb-4">Add ESP32 Board Package</h4>
+                            <div class="code-block text-green-400">
+                                <div class="text-gray-400 text-sm mb-4">
+                                    <i class="fas fa-code mr-2"></i>Board Manager URL
+                                </div>
+                                <pre class="text-sm leading-relaxed"><code>https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json</code></pre>
+                            </div>
+                            <p class="text-gray-600 text-sm mt-4">Add this URL in Arduino IDE → File → Preferences → Additional Board Manager URLs</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 2 -->
+                <div class="step-card bg-white p-8 rounded-xl shadow-lg border border-gray-200">
+                    <div class="flex items-center mb-6">
+                        <div class="bg-green-100 text-green-600 rounded-full w-12 h-12 flex items-center justify-center mr-4 font-bold text-lg">2</div>
+                        <h3 class="text-2xl font-semibold">Install ESP32 Board Package</h3>
+                    </div>
+                    
+                    <div class="space-y-4">
+                        <div class="flex items-start space-x-3">
+                            <i class="fas fa-check-circle text-green-500 mt-1"></i>
+                            <span>Open Arduino IDE</span>
+                        </div>
+                        <div class="flex items-start space-x-3">
+                            <i class="fas fa-check-circle text-green-500 mt-1"></i>
+                            <span>Go to <strong>Tools → Board → Boards Manager</strong></span>
+                        </div>
+                        <div class="flex items-start space-x-3">
+                            <i class="fas fa-check-circle text-green-500 mt-1"></i>
+                            <span>Search for <strong>"ESP32"</strong></span>
+                        </div>
+                        <div class="flex items-start space-x-3">
+                            <i class="fas fa-check-circle text-green-500 mt-1"></i>
+                            <span>Install <strong>"ESP32 by Espressif Systems"</strong></span>
+                        </div>
+                        <div class="flex items-start space-x-3">
+                            <i class="fas fa-check-circle text-green-500 mt-1"></i>
+                            <span>Wait for installation to complete</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 3 -->
+                <div class="step-card bg-white p-8 rounded-xl shadow-lg border border-gray-200">
+                    <div class="flex items-center mb-6">
+                        <div class="bg-purple-100 text-purple-600 rounded-full w-12 h-12 flex items-center justify-center mr-4 font-bold text-lg">3</div>
+                        <h3 class="text-2xl font-semibold">Download ESP32 GPIO Bridge Firmware</h3>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        <div>
+                            <h4 class="font-semibold mb-4">Clone Repository</h4>
+                            <div class="code-block text-green-400">
+                                <div class="text-gray-400 text-sm mb-4">
+                                    <i class="fas fa-code mr-2"></i>Clone Repository
+                                </div>
+                                <pre class="text-sm leading-relaxed"><code>git clone https://github.com/1999AZZAR/esp32_GPIO_bridge.git
+cd esp32_GPIO_bridge</code></pre>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <h4 class="font-semibold mb-4">Or Download ZIP</h4>
+                            <p class="text-gray-600 mb-4">Download the repository as a ZIP file and extract it.</p>
+                            <a href="https://github.com/1999AZZAR/esp32_GPIO_bridge/archive/main.zip" target="_blank" class="inline-flex items-center bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors">
+                                <i class="fas fa-download mr-2"></i>Download ZIP
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 4 -->
+                <div class="step-card bg-white p-8 rounded-xl shadow-lg border border-gray-200">
+                    <div class="flex items-center mb-6">
+                        <div class="bg-orange-100 text-orange-600 rounded-full w-12 h-12 flex items-center justify-center mr-4 font-bold text-lg">4</div>
+                        <h3 class="text-2xl font-semibold">Configure Arduino IDE</h3>
+                    </div>
+                    
+                    <div class="space-y-6">
+                        <div>
+                            <h4 class="font-semibold mb-4">Open Firmware File</h4>
+                            <p class="text-gray-600 mb-4">Navigate to the firmware directory and open <code class="bg-gray-200 px-2 py-1 rounded">firmware.ino</code></p>
+                        </div>
+                        
+                        <div>
+                            <h4 class="font-semibold mb-4">Select Board</h4>
+                            <div class="space-y-2">
+                                <div class="flex items-center space-x-3">
+                                    <i class="fas fa-arrow-right text-orange-500"></i>
+                                    <span>Go to <strong>Tools → Board → ESP32 Arduino → ESP32 Dev Module</strong></span>
+                                </div>
+                                <div class="flex items-center space-x-3">
+                                    <i class="fas fa-arrow-right text-orange-500"></i>
+                                    <span>Or select your specific ESP32 board model</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <h4 class="font-semibold mb-4">Configure Settings</h4>
+                            <div class="bg-gray-50 p-4 rounded-lg">
+                                <ul class="space-y-2 text-sm">
+                                    <li><strong>Upload Speed:</strong> 921600</li>
+                                    <li><strong>CPU Frequency:</strong> 240MHz (WiFi/BT)</li>
+                                    <li><strong>Flash Frequency:</strong> 80MHz</li>
+                                    <li><strong>Flash Mode:</strong> QIO</li>
+                                    <li><strong>Flash Size:</strong> 4MB (32Mb)</li>
+                                    <li><strong>Partition Scheme:</strong> Default 4MB with spiffs</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 5 -->
+                <div class="step-card bg-white p-8 rounded-xl shadow-lg border border-gray-200">
+                    <div class="flex items-center mb-6">
+                        <div class="bg-red-100 text-red-600 rounded-full w-12 h-12 flex items-center justify-center mr-4 font-bold text-lg">5</div>
+                        <h3 class="text-2xl font-semibold">Upload Firmware</h3>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        <div>
+                            <h4 class="font-semibold mb-4">Connect ESP32</h4>
+                            <div class="space-y-2">
+                                <div class="flex items-center space-x-3">
+                                    <i class="fas fa-usb text-blue-500"></i>
+                                    <span>Connect ESP32 to computer via USB cable</span>
+                                </div>
+                                <div class="flex items-center space-x-3">
+                                    <i class="fas fa-cog text-blue-500"></i>
+                                    <span>Select correct COM port in Arduino IDE</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <h4 class="font-semibold mb-4">Upload Firmware</h4>
+                            <div class="space-y-2">
+                                <div class="flex items-center space-x-3">
+                                    <i class="fas fa-upload text-green-500"></i>
+                                    <span>Click <strong>Upload</strong> button (→) in Arduino IDE</span>
+                                </div>
+                                <div class="flex items-center space-x-3">
+                                    <i class="fas fa-clock text-green-500"></i>
+                                    <span>Wait for upload to complete (30-60 seconds)</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="success-box p-6 rounded-lg mt-6">
+                        <div class="flex items-start">
+                            <i class="fas fa-check-circle text-green-600 text-xl mr-3 mt-1"></i>
+                            <div>
+                                <h4 class="font-semibold text-green-800 mb-2">Upload Successful!</h4>
+                                <p class="text-green-700 text-sm">You should see "Done uploading" message. Your ESP32 is now running the GPIO Bridge firmware.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Python Library Installation -->
+    <section id="python" class="py-20 bg-white">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <h2 class="text-4xl font-bold text-gray-900 mb-8">Python Library Installation</h2>
+            <p class="text-xl text-gray-600 mb-12">Install the ESP32 GPIO Bridge Python library to control your ESP32 from Python.</p>
+            
+            <div class="space-y-8">
+                <!-- Method 1: Install from Source -->
+                <div class="step-card bg-white p-8 rounded-xl shadow-lg border border-gray-200">
+                    <div class="flex items-center mb-6">
+                        <div class="bg-blue-100 text-blue-600 rounded-full w-12 h-12 flex items-center justify-center mr-4">
+                            <i class="fas fa-code"></i>
+                        </div>
+                        <h3 class="text-2xl font-semibold">Method 1: Install from Source</h3>
+                    </div>
+                    
+                    <div class="space-y-6">
+                        <div>
+                            <h4 class="font-semibold mb-4">Clone and Install</h4>
+                            <div class="code-block text-green-400">
+                                <div class="text-gray-400 text-sm mb-4">
+                                    <i class="fas fa-code mr-2"></i>Install from Source
+                                </div>
+                                <pre class="text-sm leading-relaxed"><code># Clone repository
+git clone https://github.com/1999AZZAR/esp32_GPIO_bridge.git esp32-gpio-bridge
+cd esp32-gpio-bridge
+
+# Install in development mode
+pip install -e .
+
+# Or install directly
+pip install .</code></pre>
+                            </div>
+                        </div>
+                        
+                        <div class="bg-blue-50 p-6 rounded-lg">
+                            <h4 class="font-semibold text-blue-900 mb-2">Advantages</h4>
+                            <ul class="text-blue-800 space-y-1 text-sm">
+                                <li>• Access to latest features and bug fixes</li>
+                                <li>• Can modify source code if needed</li>
+                                <li>• Includes all examples and documentation</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Method 2: Install from PyPI -->
+                <div class="step-card bg-white p-8 rounded-xl shadow-lg border border-gray-200">
+                    <div class="flex items-center mb-6">
+                        <div class="bg-green-100 text-green-600 rounded-full w-12 h-12 flex items-center justify-center mr-4">
+                            <i class="fas fa-download"></i>
+                        </div>
+                        <h3 class="text-2xl font-semibold">Method 2: Install from PyPI</h3>
+                    </div>
+                    
+                    <div class="space-y-6">
+                        <div>
+                            <h4 class="font-semibold mb-4">Simple Installation</h4>
+                            <div class="code-block text-green-400">
+                                <div class="text-gray-400 text-sm mb-4">
+                                    <i class="fas fa-code mr-2"></i>Install from PyPI
+                                </div>
+                                <pre class="text-sm leading-relaxed"><code># Install latest stable version
+pip install esp32-gpio-bridge
+
+# Install with development dependencies
+pip install esp32-gpio-bridge[dev]
+
+# Install with example dependencies
+pip install esp32-gpio-bridge[examples]</code></pre>
+                            </div>
+                        </div>
+                        
+                        <div class="bg-green-50 p-6 rounded-lg">
+                            <h4 class="font-semibold text-green-900 mb-2">Advantages</h4>
+                            <ul class="text-green-800 space-y-1 text-sm">
+                                <li>• Simple one-command installation</li>
+                                <li>• Automatic dependency management</li>
+                                <li>• Stable, tested releases</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Dependencies -->
+                <div class="step-card bg-white p-8 rounded-xl shadow-lg border border-gray-200">
+                    <div class="flex items-center mb-6">
+                        <div class="bg-purple-100 text-purple-600 rounded-full w-12 h-12 flex items-center justify-center mr-4">
+                            <i class="fas fa-puzzle-piece"></i>
+                        </div>
+                        <h3 class="text-2xl font-semibold">Dependencies</h3>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        <div>
+                            <h4 class="font-semibold mb-4">Required Dependencies</h4>
+                            <div class="code-block text-green-400">
+                                <div class="text-gray-400 text-sm mb-4">
+                                    <i class="fas fa-code mr-2"></i>Core Dependencies
+                                </div>
+                                <pre class="text-sm leading-relaxed"><code># These are installed automatically
+pyserial>=3.5
+types-pyserial  # For type hints</code></pre>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <h4 class="font-semibold mb-4">Optional Dependencies</h4>
+                            <div class="code-block text-green-400">
+                                <div class="text-gray-400 text-sm mb-4">
+                                    <i class="fas fa-code mr-2"></i>Optional Dependencies
+                                </div>
+                                <pre class="text-sm leading-relaxed"><code># For examples and development
+matplotlib
+numpy
+pytest
+black
+flake8
+mypy</code></pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Testing -->
+    <section id="testing" class="py-20 bg-gray-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <h2 class="text-4xl font-bold text-gray-900 mb-8">Testing Your Installation</h2>
+            <p class="text-xl text-gray-600 mb-12">Verify that both firmware and Python library are working correctly.</p>
+            
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div class="step-card bg-white p-8 rounded-xl shadow-lg border border-gray-200">
+                    <h3 class="text-2xl font-semibold mb-6">Test Python Library</h3>
+                    
+                    <div class="space-y-6">
+                        <div>
+                            <h4 class="font-semibold mb-4">Quick Connection Test</h4>
+                            <div class="code-block text-green-400">
+                                <div class="text-gray-400 text-sm mb-4">
+                                    <i class="fas fa-code mr-2"></i>test_connection.py
+                                </div>
+                                <pre class="text-sm leading-relaxed"><code>from esp32_gpio_bridge import ESP32GPIO, find_esp32_port
+
+# Auto-detect ESP32
+port = find_esp32_port()
+if port:
+    print(f"Found ESP32 on: {port}")
+    
+    # Test connection
+    with ESP32GPIO(port) as esp:
+        version = esp.get_version()
+        print(f"Firmware version: {version}")
+        print("✅ Connection successful!")
+else:
+    print("❌ ESP32 not found")</code></pre>
+                            </div>
+                        </div>
+                        
+                        <div class="bg-green-50 p-6 rounded-lg">
+                            <h4 class="font-semibold text-green-900 mb-2">Expected Output</h4>
+                            <div class="code-block text-green-400">
+                                <pre class="text-sm"><code>Found ESP32 on: /dev/ttyUSB0
+Firmware version: ESP32_GPIO_BRIDGE_v0.1.6-beta
+✅ Connection successful!</code></pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="step-card bg-white p-8 rounded-xl shadow-lg border border-gray-200">
+                    <h3 class="text-2xl font-semibold mb-6">Run Example</h3>
+                    
+                    <div class="space-y-6">
+                        <div>
+                            <h4 class="font-semibold mb-4">Basic I/O Example</h4>
+                            <div class="code-block text-green-400">
+                                <div class="text-gray-400 text-sm mb-4">
+                                    <i class="fas fa-code mr-2"></i>Run Example
+                                </div>
+                                <pre class="text-sm leading-relaxed"><code># Navigate to examples directory
+cd examples
+
+# Run basic I/O example
+python basic_io_example.py
+
+# Run LED patterns example
+python led_patterns_example.py</code></pre>
+                            </div>
+                        </div>
+                        
+                        <div class="bg-blue-50 p-6 rounded-lg">
+                            <h4 class="font-semibold text-blue-900 mb-2">Hardware Setup</h4>
+                            <ul class="text-blue-800 space-y-1 text-sm">
+                                <li>• Connect LED to GPIO 2 with 220Ω resistor</li>
+                                <li>• Connect button to GPIO 0 (optional)</li>
+                                <li>• Connect potentiometer to GPIO 34 (optional)</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Troubleshooting -->
+    <section id="troubleshooting" class="py-20 bg-white">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <h2 class="text-4xl font-bold text-gray-900 mb-8">Troubleshooting</h2>
+            <p class="text-xl text-gray-600 mb-12">Common issues and their solutions.</p>
+            
+            <div class="space-y-8">
+                <div class="bg-red-50 border border-red-200 rounded-lg p-8">
+                    <h3 class="text-2xl font-semibold text-red-900 mb-6">Common Issues</h3>
+                    
+                    <div class="space-y-6">
+                        <div>
+                            <h4 class="font-semibold text-red-800 mb-3">ESP32 Not Detected</h4>
+                            <div class="space-y-2 text-red-700">
+                                <p><strong>Problem:</strong> <code>find_esp32_port()</code> returns None</p>
+                                <p><strong>Solutions:</strong></p>
+                                <ul class="list-disc list-inside space-y-1 ml-4">
+                                    <li>Check USB cable connection</li>
+                                    <li>Install ESP32 USB drivers (CP2102, CH340, etc.)</li>
+                                    <li>Try different USB port</li>
+                                    <li>Reset ESP32 board</li>
+                                    <li>Check if another program is using the serial port</li>
+                                </ul>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <h4 class="font-semibold text-red-800 mb-3">Permission Denied (Linux/Mac)</h4>
+                            <div class="space-y-2 text-red-700">
+                                <p><strong>Problem:</strong> Permission denied when accessing serial port</p>
+                                <p><strong>Solution:</strong></p>
+                                <div class="code-block text-green-400 mt-2">
+                                    <pre class="text-sm"><code># Add user to dialout group
+sudo usermod -a -G dialout $USER
+
+# Logout and login again, or run:
+newgrp dialout</code></pre>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <h4 class="font-semibold text-red-800 mb-3">Upload Failed</h4>
+                            <div class="space-y-2 text-red-700">
+                                <p><strong>Problem:</strong> Firmware upload fails in Arduino IDE</p>
+                                <p><strong>Solutions:</strong></p>
+                                <ul class="list-disc list-inside space-y-1 ml-4">
+                                    <li>Hold BOOT button while clicking Upload</li>
+                                    <li>Try lower upload speed (115200 or 57600)</li>
+                                    <li>Check USB cable (use data cable, not charging cable)</li>
+                                    <li>Try different USB port</li>
+                                    <li>Disconnect other USB devices temporarily</li>
+                                </ul>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <h4 class="font-semibold text-red-800 mb-3">No Response from ESP32</h4>
+                            <div class="space-y-2 text-red-700">
+                                <p><strong>Problem:</strong> Python can connect but gets no response</p>
+                                <p><strong>Solutions:</strong></p>
+                                <ul class="list-disc list-inside space-y-1 ml-4">
+                                    <li>Verify correct baud rate (115200)</li>
+                                    <li>Check if firmware was uploaded correctly</li>
+                                    <li>Reset ESP32 board</li>
+                                    <li>Try different serial port</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-8">
+                    <h3 class="text-2xl font-semibold text-blue-900 mb-6">Getting Help</h3>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <h4 class="font-semibold text-blue-800 mb-3">Documentation</h4>
+                            <ul class="text-blue-700 space-y-2">
+                                <li><a href="examples.html" class="hover:text-blue-900 underline">Examples and Tutorials</a></li>
+                                <li><a href="api.html" class="hover:text-blue-900 underline">Complete API Reference</a></li>
+                                <li><a href="performance.html" class="hover:text-blue-900 underline">Performance Guide</a></li>
+                                <li><a href="architecture.html" class="hover:text-blue-900 underline">Technical Architecture</a></li>
+                            </ul>
+                        </div>
+                        
+                        <div>
+                            <h4 class="font-semibold text-blue-800 mb-3">Community Support</h4>
+                            <ul class="text-blue-700 space-y-2">
+                                <li><a href="#" class="hover:text-blue-900 underline">GitHub Issues</a></li>
+                                <li><a href="#" class="hover:text-blue-900 underline">Discord Community</a></li>
+                                <li><a href="#" class="hover:text-blue-900 underline">Stack Overflow</a></li>
+                                <li><a href="#" class="hover:text-blue-900 underline">Reddit r/esp32</a></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Next Steps -->
+    <section class="py-20 bg-blue-600">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <h2 class="text-4xl font-bold text-white mb-4">Ready to Start Building?</h2>
+            <p class="text-xl text-blue-100 mb-8 max-w-3xl mx-auto">
+                Your ESP32 GPIO Bridge is now ready! Check out the examples and start building amazing projects.
+            </p>
+            <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                <a href="examples.html" class="bg-white text-blue-600 px-8 py-3 rounded-lg font-semibold hover:bg-blue-50 transition-colors">
+                    <i class="fas fa-play mr-2"></i>View Examples
+                </a>
+                <a href="api.html" class="border-2 border-white text-white px-8 py-3 rounded-lg font-semibold hover:bg-white hover:text-blue-600 transition-colors">
+                    <i class="fas fa-book mr-2"></i>API Reference
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="bg-gray-900 text-white py-12">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div>
+                    <h3 class="text-xl font-bold mb-4">
+                        <i class="fas fa-microchip mr-2"></i>ESP32 GPIO Bridge
+                    </h3>
+                    <p class="text-gray-400 mb-4">
+                        Professional-grade GPIO control from Python. Transform your ESP32 into a powerful hardware interface.
+                    </p>
+                    <div class="flex space-x-4">
+                        <a href="#" class="text-gray-400 hover:text-white">
+                            <i class="fab fa-github text-xl"></i>
+                        </a>
+                        <a href="#" class="text-gray-400 hover:text-white">
+                            <i class="fab fa-python text-xl"></i>
+                        </a>
+                    </div>
+                </div>
+                
+                <div>
+                    <h4 class="text-lg font-semibold mb-4">Documentation</h4>
+                    <ul class="space-y-2 text-gray-400">
+                        <li><a href="features.html" class="hover:text-white">Features</a></li>
+                        <li><a href="examples.html" class="hover:text-white">Examples</a></li>
+                        <li><a href="api.html" class="hover:text-white">API Reference</a></li>
+                        <li><a href="installation.html" class="hover:text-white">Installation</a></li>
+                    </ul>
+                </div>
+                
+                <div>
+                    <h4 class="text-lg font-semibold mb-4">Resources</h4>
+                    <ul class="space-y-2 text-gray-400">
+                        <li><a href="performance.html" class="hover:text-white">Performance</a></li>
+                        <li><a href="architecture.html" class="hover:text-white">Architecture</a></li>
+                        <li><a href="#" class="hover:text-white">GitHub Repository</a></li>
+                        <li><a href="#" class="hover:text-white">Issue Tracker</a></li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="border-t border-gray-800 mt-8 pt-8 text-center text-gray-400">
+                <p>&copy; 2024 ESP32 GPIO Bridge Project. MIT License.</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- JavaScript -->
+    <script>
+        // Mobile menu toggle
+        document.getElementById('mobile-menu-btn').addEventListener('click', function() {
+            const mobileMenu = document.getElementById('mobile-menu');
+            mobileMenu.classList.toggle('hidden');
+        });
+
+        // Smooth scrolling for anchor links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
+            });
+        });
+    </script>
+</body>
+</html>

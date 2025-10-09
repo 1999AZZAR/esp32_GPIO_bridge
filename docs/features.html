@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Features - ESP32 GPIO Bridge</title>
+    <meta name="description" content="Comprehensive features overview of ESP32 GPIO Bridge: GPIO control, PWM, analog I/O, I2C communication, EEPROM storage, and performance optimizations.">
+    
+    <!-- TailwindCSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Custom Styles -->
+    <style>
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .code-block {
+            background: #1e293b;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+        }
+        .feature-section {
+            scroll-margin-top: 5rem;
+        }
+        .nav-link {
+            transition: color 0.3s ease;
+        }
+        .nav-link:hover {
+            color: #3b82f6;
+        }
+        .spec-table {
+            background: white;
+            border-radius: 0.5rem;
+            overflow: hidden;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-900">
+    <!-- Navigation -->
+    <nav class="bg-white shadow-lg sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <a href="index.html" class="text-2xl font-bold text-blue-600">
+                            <i class="fas fa-microchip mr-2"></i>ESP32 GPIO Bridge
+                        </a>
+                    </div>
+                </div>
+                <div class="hidden md:block">
+                    <div class="ml-10 flex items-baseline space-x-8">
+                        <a href="index.html" class="nav-link text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium">Home</a>
+                        <a href="features.html" class="nav-link text-blue-600 px-3 py-2 text-sm font-medium">Features</a>
+                        <a href="examples.html" class="nav-link text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium">Examples</a>
+                        <a href="api.html" class="nav-link text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium">API</a>
+                        <a href="installation.html" class="nav-link text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium">Installation</a>
+                        <a href="performance.html" class="nav-link text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium">Performance</a>
+                        <a href="architecture.html" class="nav-link text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium">Architecture</a>
+                    </div>
+                </div>
+                <div class="md:hidden">
+                    <button id="mobile-menu-btn" class="text-gray-700 hover:text-blue-600">
+                        <i class="fas fa-bars text-xl"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+        <!-- Mobile menu -->
+        <div id="mobile-menu" class="md:hidden hidden bg-white border-t">
+            <div class="px-2 pt-2 pb-3 space-y-1">
+                <a href="index.html" class="nav-link block px-3 py-2 text-gray-700 hover:text-blue-600">Home</a>
+                <a href="features.html" class="nav-link block px-3 py-2 text-blue-600">Features</a>
+                <a href="examples.html" class="nav-link block px-3 py-2 text-gray-700 hover:text-blue-600">Examples</a>
+                <a href="api.html" class="nav-link block px-3 py-2 text-gray-700 hover:text-blue-600">API</a>
+                <a href="installation.html" class="nav-link block px-3 py-2 text-gray-700 hover:text-blue-600">Installation</a>
+                <a href="performance.html" class="nav-link block px-3 py-2 text-gray-700 hover:text-blue-600">Performance</a>
+                <a href="architecture.html" class="nav-link block px-3 py-2 text-gray-700 hover:text-blue-600">Architecture</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="gradient-bg text-white py-16">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <h1 class="text-4xl md:text-5xl font-bold mb-6">Features Overview</h1>
+            <p class="text-xl text-blue-100 max-w-3xl mx-auto">
+                Comprehensive GPIO control, PWM, analog I/O, I2C communication, and more with professional-grade performance.
+            </p>
+        </div>
+    </section>
+
+    <!-- Feature Navigation -->
+    <section class="bg-white py-8 border-b">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex flex-wrap justify-center gap-4">
+                <a href="#gpio" class="bg-blue-100 text-blue-700 px-4 py-2 rounded-lg hover:bg-blue-200 transition-colors">
+                    <i class="fas fa-plug mr-2"></i>GPIO Control
+                </a>
+                <a href="#pwm" class="bg-green-100 text-green-700 px-4 py-2 rounded-lg hover:bg-green-200 transition-colors">
+                    <i class="fas fa-wave-square mr-2"></i>PWM
+                </a>
+                <a href="#analog" class="bg-purple-100 text-purple-700 px-4 py-2 rounded-lg hover:bg-purple-200 transition-colors">
+                    <i class="fas fa-chart-line mr-2"></i>Analog I/O
+                </a>
+                <a href="#i2c" class="bg-orange-100 text-orange-700 px-4 py-2 rounded-lg hover:bg-orange-200 transition-colors">
+                    <i class="fas fa-network-wired mr-2"></i>I2C
+                </a>
+                <a href="#eeprom" class="bg-red-100 text-red-700 px-4 py-2 rounded-lg hover:bg-red-200 transition-colors">
+                    <i class="fas fa-database mr-2"></i>EEPROM
+                </a>
+                <a href="#safety" class="bg-yellow-100 text-yellow-700 px-4 py-2 rounded-lg hover:bg-yellow-200 transition-colors">
+                    <i class="fas fa-shield-alt mr-2"></i>Safety
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- GPIO Control Section -->
+    <section id="gpio" class="py-20 bg-white feature-section">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+                <div>
+                    <div class="flex items-center mb-6">
+                        <div class="bg-blue-100 text-blue-600 rounded-full w-12 h-12 flex items-center justify-center mr-4">
+                            <i class="fas fa-plug text-xl"></i>
+                        </div>
+                        <h2 class="text-3xl font-bold">Digital GPIO Control</h2>
+                    </div>
+                    
+                    <p class="text-xl text-gray-600 mb-6">
+                        Complete control over all 40 GPIO pins with input/output modes, pull-up resistors, and efficient batch operations.
+                    </p>
+                    
+                    <div class="space-y-4 mb-8">
+                        <div class="flex items-center">
+                            <i class="fas fa-check text-green-500 mr-3"></i>
+                            <span><strong>40 GPIO Pins:</strong> Full control over pins 0-39</span>
+                        </div>
+                        <div class="flex items-center">
+                            <i class="fas fa-check text-green-500 mr-3"></i>
+                            <span><strong>Multiple Modes:</strong> INPUT, OUTPUT, INPUT_PULLUP</span>
+                        </div>
+                        <div class="flex items-center">
+                            <i class="fas fa-check text-green-500 mr-3"></i>
+                            <span><strong>Batch Operations:</strong> Control multiple pins simultaneously</span>
+                        </div>
+                        <div class="flex items-center">
+                            <i class="fas fa-check text-green-500 mr-3"></i>
+                            <span><strong>Pin Validation:</strong> Automatic capability checking</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="code-block text-green-400">
+                    <div class="text-gray-400 text-sm mb-4">
+                        <i class="fas fa-code mr-2"></i>GPIO Control Example
+                    </div>
+                    <pre class="text-sm leading-relaxed"><code>from esp32_gpio_bridge import ESP32GPIO
+
+with ESP32GPIO(port) as esp:
+    # Set pin modes
+    esp.set_pin_mode(2, "OUT")      # LED pin
+    esp.set_pin_mode(0, "IN_PULLUP") # Button pin
+    
+    # Digital operations
+    esp.digital_write(2, 1)         # Turn LED on
+    button_state = esp.digital_read(0)  # Read button
+    
+    # Batch operations (much faster)
+    esp.batch_digital_write({
+        2: 1,   # LED on
+        4: 0,   # Pin 4 low
+        5: 1    # Pin 5 high
+    })
+    
+    # Get configured pins
+    pins = esp.get_configured_pins()
+    print(f"Configured pins: {pins}")</code></pre>
+                </div>
+            </div>
+            
+            <!-- GPIO Pin Table -->
+            <div class="mt-16">
+                <h3 class="text-2xl font-bold mb-6">GPIO Pin Capabilities</h3>
+                <div class="spec-table">
+                    <table class="w-full">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pin Range</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Digital I/O</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Analog Input</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">PWM</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Notes</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-200">
+                            <tr>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">GPIO 0-31</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    <i class="fas fa-check text-green-500"></i>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    <i class="fas fa-times text-red-500"></i>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    <i class="fas fa-check text-green-500"></i>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Output only (some pins)</td>
+                            </tr>
+                            <tr class="bg-gray-50">
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">GPIO 32-39</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    <i class="fas fa-check text-green-500"></i>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    <i class="fas fa-check text-green-500"></i>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    <i class="fas fa-check text-green-500"></i>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">ADC capable</td>
+                            </tr>
+                            <tr>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">GPIO 25, 26</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    <i class="fas fa-check text-green-500"></i>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    <i class="fas fa-times text-red-500"></i>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    <i class="fas fa-check text-green-500"></i>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">DAC output</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- PWM Section -->
+    <section id="pwm" class="py-20 bg-gray-50 feature-section">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+                <div class="order-2 lg:order-1">
+                    <div class="code-block text-green-400">
+                        <div class="text-gray-400 text-sm mb-4">
+                            <i class="fas fa-code mr-2"></i>PWM Control Example
+                        </div>
+                        <pre class="text-sm leading-relaxed"><code>from esp32_gpio_bridge import ESP32GPIO
+
+with ESP32GPIO(port) as esp:
+    # Initialize PWM
+    channel = esp.pwm_init(
+        pin=2,           # GPIO pin
+        frequency=1000,  # 1kHz frequency
+        resolution=8     # 8-bit resolution (0-255)
+    )
+    
+    # Set duty cycle (raw value)
+    esp.pwm_write(2, 128)  # 50% duty cycle
+    
+    # Set duty cycle (percentage)
+    esp.pwm_set_duty_percent(2, 75.0)  # 75% duty cycle
+    
+    # Fade LED effect
+    for i in range(0, 256, 5):
+        esp.pwm_write(2, i)
+        time.sleep(0.01)
+    
+    # Stop PWM
+    esp.pwm_stop(2)</code></pre>
+                    </div>
+                </div>
+                
+                <div class="order-1 lg:order-2">
+                    <div class="flex items-center mb-6">
+                        <div class="bg-green-100 text-green-600 rounded-full w-12 h-12 flex items-center justify-center mr-4">
+                            <i class="fas fa-wave-square text-xl"></i>
+                        </div>
+                        <h2 class="text-3xl font-bold">Hardware PWM</h2>
+                    </div>
+                    
+                    <p class="text-xl text-gray-600 mb-6">
+                        Hardware PWM with up to 16 channels, configurable frequency and resolution for precise control of motors, LEDs, and servos.
+                    </p>
+                    
+                    <div class="space-y-4 mb-8">
+                        <div class="flex items-center">
+                            <i class="fas fa-check text-green-500 mr-3"></i>
+                            <span><strong>16 PWM Channels:</strong> Hardware-based PWM</span>
+                        </div>
+                        <div class="flex items-center">
+                            <i class="fas fa-check text-green-500 mr-3"></i>
+                            <span><strong>Frequency Range:</strong> 1Hz to 40kHz</span>
+                        </div>
+                        <div class="flex items-center">
+                            <i class="fas fa-check text-green-500 mr-3"></i>
+                            <span><strong>Resolution:</strong> 1-16 bits (1-65535 steps)</span>
+                        </div>
+                        <div class="flex items-center">
+                            <i class="fas fa-check text-green-500 mr-3"></i>
+                            <span><strong>O(1) Lookup:</strong> Instant PWM operations</span>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-blue-50 p-6 rounded-lg">
+                        <h4 class="font-semibold text-blue-900 mb-2">Use Cases</h4>
+                        <ul class="text-blue-800 space-y-1">
+                            <li>• Servo motor control</li>
+                            <li>• LED brightness control</li>
+                            <li>• Motor speed control</li>
+                            <li>• Audio signal generation</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Analog I/O Section -->
+    <section id="analog" class="py-20 bg-white feature-section">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+                <div>
+                    <div class="flex items-center mb-6">
+                        <div class="bg-purple-100 text-purple-600 rounded-full w-12 h-12 flex items-center justify-center mr-4">
+                            <i class="fas fa-chart-line text-xl"></i>
+                        </div>
+                        <h2 class="text-3xl font-bold">Analog I/O</h2>
+                    </div>
+                    
+                    <p class="text-xl text-gray-600 mb-6">
+                        12-bit ADC input and 8-bit DAC output for precise analog signal processing and generation.
+                    </p>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="bg-purple-50 p-6 rounded-lg">
+                            <h4 class="font-semibold text-purple-900 mb-3">
+                                <i class="fas fa-arrow-down mr-2"></i>ADC Input
+                            </h4>
+                            <ul class="text-purple-800 space-y-1 text-sm">
+                                <li>• 12-bit resolution (0-4095)</li>
+                                <li>• 0-3.3V voltage range</li>
+                                <li>• GPIO 32-39 (ADC1)</li>
+                                <li>• eFuse calibration</li>
+                            </ul>
+                        </div>
+                        
+                        <div class="bg-purple-50 p-6 rounded-lg">
+                            <h4 class="font-semibold text-purple-900 mb-3">
+                                <i class="fas fa-arrow-up mr-2"></i>DAC Output
+                            </h4>
+                            <ul class="text-purple-800 space-y-1 text-sm">
+                                <li>• 8-bit resolution (0-255)</li>
+                                <li>• 0-3.3V voltage range</li>
+                                <li>• GPIO 25, 26 (DAC1, DAC2)</li>
+                                <li>• Direct voltage output</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="code-block text-green-400">
+                    <div class="text-gray-400 text-sm mb-4">
+                        <i class="fas fa-code mr-2"></i>Analog I/O Example
+                    </div>
+                    <pre class="text-sm leading-relaxed"><code>from esp32_gpio_bridge import ESP32GPIO
+
+with ESP32GPIO(port) as esp:
+    # Analog input - read sensor
+    raw_value = esp.analog_read(34)  # GPIO 34
+    voltage = (raw_value / 4095.0) * 3.3
+    print(f"Sensor voltage: {voltage:.2f}V")
+    
+    # Analog output - generate voltage
+    esp.analog_write(25, 128)  # 1.65V on GPIO 25
+    esp.analog_write(26, 255)  # 3.3V on GPIO 26
+    
+    # Continuous monitoring
+    while True:
+        sensor_val = esp.analog_read(34)
+        # Convert to percentage
+        percentage = (sensor_val / 4095.0) * 100
+        print(f"Sensor reading: {percentage:.1f}%")
+        time.sleep(0.1)</code></pre>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- I2C Section -->
+    <section id="i2c" class="py-20 bg-gray-50 feature-section">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+                <div class="order-2 lg:order-1">
+                    <div class="code-block text-green-400">
+                        <div class="text-gray-400 text-sm mb-4">
+                            <i class="fas fa-code mr-2"></i>I2C Communication Example
+                        </div>
+                        <pre class="text-sm leading-relaxed"><code>from esp32_gpio_bridge import ESP32GPIO
+
+with ESP32GPIO(port) as esp:
+    # Initialize I2C bus
+    esp.i2c_init(sda=21, scl=22, frequency=100000)
+    
+    # Scan for devices
+    devices = esp.i2c_scan()
+    print(f"Found devices: {[hex(addr) for addr in devices]}")
+    
+    # Write to device (e.g., OLED display)
+    esp.i2c_write(0x3C, [0x00, 0xFF, 0x80])  # Address, data
+    
+    # Read from device (e.g., sensor)
+    data = esp.i2c_read(0x48, 4)  # Address, bytes to read
+    print(f"Read data: {data}")
+    
+    # Common sensor operations
+    # Write register address
+    esp.i2c_write(0x48, [0x00])  # Register 0x00
+    # Read sensor data
+    sensor_data = esp.i2c_read(0x48, 2)
+    temperature = (sensor_data[0] << 8) | sensor_data[1]
+    print(f"Temperature: {temperature}")</code></pre>
+                    </div>
+                </div>
+                
+                <div class="order-1 lg:order-2">
+                    <div class="flex items-center mb-6">
+                        <div class="bg-orange-100 text-orange-600 rounded-full w-12 h-12 flex items-center justify-center mr-4">
+                            <i class="fas fa-network-wired text-xl"></i>
+                        </div>
+                        <h2 class="text-3xl font-bold">I2C Communication</h2>
+                    </div>
+                    
+                    <p class="text-xl text-gray-600 mb-6">
+                        Full I2C bus control with device scanning, read/write operations, and support for common sensors and peripherals.
+                    </p>
+                    
+                    <div class="space-y-4 mb-8">
+                        <div class="flex items-center">
+                            <i class="fas fa-check text-green-500 mr-3"></i>
+                            <span><strong>Device Scanning:</strong> Automatic device detection</span>
+                        </div>
+                        <div class="flex items-center">
+                            <i class="fas fa-check text-green-500 mr-3"></i>
+                            <span><strong>Configurable Pins:</strong> Default SDA=21, SCL=22</span>
+                        </div>
+                        <div class="flex items-center">
+                            <i class="fas fa-check text-green-500 mr-3"></i>
+                            <span><strong>Speed Control:</strong> 1kHz to 1MHz</span>
+                        </div>
+                        <div class="flex items-center">
+                            <i class="fas fa-check text-green-500 mr-3"></i>
+                            <span><strong>Error Handling:</strong> Robust communication</span>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-orange-50 p-6 rounded-lg">
+                        <h4 class="font-semibold text-orange-900 mb-2">Supported Devices</h4>
+                        <ul class="text-orange-800 space-y-1">
+                            <li>• Temperature sensors (TMP36, DS18B20)</li>
+                            <li>• OLED displays (SSD1306)</li>
+                            <li>• Accelerometers (MPU6050)</li>
+                            <li>• Real-time clocks (DS1307)</li>
+                            <li>• EEPROM chips (24LC256)</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- EEPROM Section -->
+    <section id="eeprom" class="py-20 bg-white feature-section">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+                <div>
+                    <div class="flex items-center mb-6">
+                        <div class="bg-red-100 text-red-600 rounded-full w-12 h-12 flex items-center justify-center mr-4">
+                            <i class="fas fa-database text-xl"></i>
+                        </div>
+                        <h2 class="text-3xl font-bold">EEPROM Storage</h2>
+                    </div>
+                    
+                    <p class="text-xl text-gray-600 mb-6">
+                        512 bytes of persistent storage for configuration data, settings, and small data persistence.
+                    </p>
+                    
+                    <div class="space-y-4 mb-8">
+                        <div class="flex items-center">
+                            <i class="fas fa-check text-green-500 mr-3"></i>
+                            <span><strong>512 Bytes:</strong> Persistent storage space</span>
+                        </div>
+                        <div class="flex items-center">
+                            <i class="fas fa-check text-green-500 mr-3"></i>
+                            <span><strong>Block Operations:</strong> Read/write multiple bytes</span>
+                        </div>
+                        <div class="flex items-center">
+                            <i class="fas fa-check text-green-500 mr-3"></i>
+                            <span><strong>String Support:</strong> Direct string storage</span>
+                        </div>
+                        <div class="flex items-center">
+                            <i class="fas fa-check text-green-500 mr-3"></i>
+                            <span><strong>Commit System:</strong> Safe write operations</span>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-red-50 p-6 rounded-lg">
+                        <h4 class="font-semibold text-red-900 mb-2">Use Cases</h4>
+                        <ul class="text-red-800 space-y-1">
+                            <li>• WiFi credentials storage</li>
+                            <li>• Device configuration</li>
+                            <li>• Calibration data</li>
+                            <li>• User preferences</li>
+                            <li>• Small data logging</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="code-block text-green-400">
+                    <div class="text-gray-400 text-sm mb-4">
+                        <i class="fas fa-code mr-2"></i>EEPROM Operations Example
+                    </div>
+                    <pre class="text-sm leading-relaxed"><code>from esp32_gpio_bridge import ESP32GPIO
+
+with ESP32GPIO(port) as esp:
+    # Single byte operations
+    esp.eeprom_write(0, 42)        # Write byte
+    value = esp.eeprom_read(0)     # Read byte
+    
+    # Block operations
+    data = [10, 20, 30, 40, 50]
+    esp.eeprom_write_block(10, data)
+    read_data = esp.eeprom_read_block(10, 5)
+    
+    # String operations
+    esp.eeprom_write_string(100, "Hello ESP32!")
+    esp.eeprom_commit()  # Save to flash
+    
+    text = esp.eeprom_read_string(100, 12)
+    print(f"Stored text: {text}")
+    
+    # Configuration storage
+    config = {
+        'wifi_ssid': 'MyNetwork',
+        'wifi_password': 'secret123',
+        'device_id': 12345
+    }
+    
+    # Store configuration as JSON
+    import json
+    config_json = json.dumps(config)
+    esp.eeprom_write_string(200, config_json)
+    esp.eeprom_commit()</code></pre>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Safety Features Section -->
+    <section id="safety" class="py-20 bg-gray-50 feature-section">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-16">
+                <div class="flex items-center justify-center mb-6">
+                    <div class="bg-yellow-100 text-yellow-600 rounded-full w-12 h-12 flex items-center justify-center mr-4">
+                        <i class="fas fa-shield-alt text-xl"></i>
+                    </div>
+                    <h2 class="text-3xl font-bold">Safety Features</h2>
+                </div>
+                <p class="text-xl text-gray-600 max-w-3xl mx-auto">
+                    Intelligent failsafe system and safety mechanisms to prevent hardware damage and ensure reliable operation.
+                </p>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                <div class="bg-white p-8 rounded-xl shadow-lg">
+                    <div class="text-yellow-600 text-4xl mb-4">
+                        <i class="fas fa-clock"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold mb-3">Smart Failsafe</h3>
+                    <p class="text-gray-600 mb-4">Multi-stage failsafe system with intelligent activation and instant recovery.</p>
+                    <ul class="text-sm text-gray-500 space-y-1">
+                        <li>• 30-second total timeout</li>
+                        <li>• Query-safe operations</li>
+                        <li>• Instant recovery</li>
+                        <li>• Manual control</li>
+                    </ul>
+                </div>
+                
+                <div class="bg-white p-8 rounded-xl shadow-lg">
+                    <div class="text-yellow-600 text-4xl mb-4">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold mb-3">Pin Validation</h3>
+                    <p class="text-gray-600 mb-4">Automatic pin capability checking and mode validation.</p>
+                    <ul class="text-sm text-gray-500 space-y-1">
+                        <li>• Capability detection</li>
+                        <li>• Mode validation</li>
+                        <li>• Error prevention</li>
+                        <li>• Safe defaults</li>
+                    </ul>
+                </div>
+                
+                <div class="bg-white p-8 rounded-xl shadow-lg">
+                    <div class="text-yellow-600 text-4xl mb-4">
+                        <i class="fas fa-exclamation-triangle"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold mb-3">Error Handling</h3>
+                    <p class="text-gray-600 mb-4">Comprehensive error handling with detailed feedback and recovery.</p>
+                    <ul class="text-sm text-gray-500 space-y-1">
+                        <li>• Detailed error messages</li>
+                        <li>• Automatic retry logic</li>
+                        <li>• Connection monitoring</li>
+                        <li>• Graceful degradation</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="mt-16 bg-white p-8 rounded-xl shadow-lg">
+                <h3 class="text-2xl font-bold mb-6">Failsafe System Details</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div>
+                        <h4 class="font-semibold mb-4">Activation Conditions</h4>
+                        <ul class="space-y-2 text-gray-600">
+                            <li class="flex items-start">
+                                <i class="fas fa-arrow-right text-blue-500 mr-2 mt-1"></i>
+                                <span>Only activates after output commands (MODE OUT, WRITE, PWM, etc.)</span>
+                            </li>
+                            <li class="flex items-start">
+                                <i class="fas fa-arrow-right text-blue-500 mr-2 mt-1"></i>
+                                <span>Query commands (IDENTIFY, VERSION, READ) don't trigger failsafe</span>
+                            </li>
+                            <li class="flex items-start">
+                                <i class="fas fa-arrow-right text-blue-500 mr-2 mt-1"></i>
+                                <span>30-second total timeout (10s warning + 20s grace period)</span>
+                            </li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h4 class="font-semibold mb-4">Recovery Process</h4>
+                        <ul class="space-y-2 text-gray-600">
+                            <li class="flex items-start">
+                                <i class="fas fa-arrow-right text-green-500 mr-2 mt-1"></i>
+                                <span>Any command immediately disengages failsafe</span>
+                            </li>
+                            <li class="flex items-start">
+                                <i class="fas fa-arrow-right text-green-500 mr-2 mt-1"></i>
+                                <span>All configured pins reset to INPUT mode for safety</span>
+                            </li>
+                            <li class="flex items-start">
+                                <i class="fas fa-arrow-right text-green-500 mr-2 mt-1"></i>
+                                <span>Detailed logging of reset operations</span>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="bg-gray-900 text-white py-12">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div>
+                    <h3 class="text-xl font-bold mb-4">
+                        <i class="fas fa-microchip mr-2"></i>ESP32 GPIO Bridge
+                    </h3>
+                    <p class="text-gray-400 mb-4">
+                        Professional-grade GPIO control from Python. Transform your ESP32 into a powerful hardware interface.
+                    </p>
+                    <div class="flex space-x-4">
+                        <a href="#" class="text-gray-400 hover:text-white">
+                            <i class="fab fa-github text-xl"></i>
+                        </a>
+                        <a href="#" class="text-gray-400 hover:text-white">
+                            <i class="fab fa-python text-xl"></i>
+                        </a>
+                    </div>
+                </div>
+                
+                <div>
+                    <h4 class="text-lg font-semibold mb-4">Documentation</h4>
+                    <ul class="space-y-2 text-gray-400">
+                        <li><a href="features.html" class="hover:text-white">Features</a></li>
+                        <li><a href="examples.html" class="hover:text-white">Examples</a></li>
+                        <li><a href="api.html" class="hover:text-white">API Reference</a></li>
+                        <li><a href="installation.html" class="hover:text-white">Installation</a></li>
+                    </ul>
+                </div>
+                
+                <div>
+                    <h4 class="text-lg font-semibold mb-4">Resources</h4>
+                    <ul class="space-y-2 text-gray-400">
+                        <li><a href="performance.html" class="hover:text-white">Performance</a></li>
+                        <li><a href="architecture.html" class="hover:text-white">Architecture</a></li>
+                        <li><a href="#" class="hover:text-white">GitHub Repository</a></li>
+                        <li><a href="#" class="hover:text-white">Issue Tracker</a></li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="border-t border-gray-800 mt-8 pt-8 text-center text-gray-400">
+                <p>&copy; 2024 ESP32 GPIO Bridge Project. MIT License.</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- JavaScript -->
+    <script>
+        // Mobile menu toggle
+        document.getElementById('mobile-menu-btn').addEventListener('click', function() {
+            const mobileMenu = document.getElementById('mobile-menu');
+            mobileMenu.classList.toggle('hidden');
+        });
+
+        // Smooth scrolling for anchor links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
+            });
+        });
+    </script>
+</body>
+</html>

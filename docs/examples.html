@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Examples - ESP32 GPIO Bridge</title>
+    <meta name="description" content="Real-world examples and use cases for ESP32 GPIO Bridge. Learn how to control LEDs, servos, sensors, and more with practical Python code examples.">
+    
+    <!-- TailwindCSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Custom Styles -->
+    <style>
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .code-block {
+            background: #1e293b;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+        }
+        .example-card {
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .example-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+        .nav-link {
+            transition: color 0.3s ease;
+        }
+        .nav-link:hover {
+            color: #3b82f6;
+        }
+        .difficulty-badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        .difficulty-beginner { background-color: #dcfce7; color: #166534; }
+        .difficulty-intermediate { background-color: #fef3c7; color: #92400e; }
+        .difficulty-advanced { background-color: #fee2e2; color: #991b1b; }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-900">
+    <!-- Navigation -->
+    <nav class="bg-white shadow-lg sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <a href="index.html" class="text-2xl font-bold text-blue-600">
+                            <i class="fas fa-microchip mr-2"></i>ESP32 GPIO Bridge
+                        </a>
+                    </div>
+                </div>
+                <div class="hidden md:block">
+                    <div class="ml-10 flex items-baseline space-x-8">
+                        <a href="index.html" class="nav-link text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium">Home</a>
+                        <a href="features.html" class="nav-link text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium">Features</a>
+                        <a href="examples.html" class="nav-link text-blue-600 px-3 py-2 text-sm font-medium">Examples</a>
+                        <a href="api.html" class="nav-link text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium">API</a>
+                        <a href="installation.html" class="nav-link text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium">Installation</a>
+                        <a href="performance.html" class="nav-link text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium">Performance</a>
+                        <a href="architecture.html" class="nav-link text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium">Architecture</a>
+                    </div>
+                </div>
+                <div class="md:hidden">
+                    <button id="mobile-menu-btn" class="text-gray-700 hover:text-blue-600">
+                        <i class="fas fa-bars text-xl"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+        <!-- Mobile menu -->
+        <div id="mobile-menu" class="md:hidden hidden bg-white border-t">
+            <div class="px-2 pt-2 pb-3 space-y-1">
+                <a href="index.html" class="nav-link block px-3 py-2 text-gray-700 hover:text-blue-600">Home</a>
+                <a href="features.html" class="nav-link block px-3 py-2 text-gray-700 hover:text-blue-600">Features</a>
+                <a href="examples.html" class="nav-link block px-3 py-2 text-blue-600">Examples</a>
+                <a href="api.html" class="nav-link block px-3 py-2 text-gray-700 hover:text-blue-600">API</a>
+                <a href="installation.html" class="nav-link block px-3 py-2 text-gray-700 hover:text-blue-600">Installation</a>
+                <a href="performance.html" class="nav-link block px-3 py-2 text-gray-700 hover:text-blue-600">Performance</a>
+                <a href="architecture.html" class="nav-link block px-3 py-2 text-gray-700 hover:text-blue-600">Architecture</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="gradient-bg text-white py-16">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <h1 class="text-4xl md:text-5xl font-bold mb-6">Real-World Examples</h1>
+            <p class="text-xl text-blue-100 max-w-3xl mx-auto">
+                Learn how to use ESP32 GPIO Bridge with practical examples. From basic LED control to advanced sensor monitoring and servo control.
+            </p>
+        </div>
+    </section>
+
+    <!-- Quick Navigation -->
+    <section class="bg-white py-8 border-b">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex flex-wrap justify-center gap-4">
+                <a href="#basic" class="bg-blue-100 text-blue-700 px-4 py-2 rounded-lg hover:bg-blue-200 transition-colors">
+                    <i class="fas fa-play mr-2"></i>Basic I/O
+                </a>
+                <a href="#leds" class="bg-green-100 text-green-700 px-4 py-2 rounded-lg hover:bg-green-200 transition-colors">
+                    <i class="fas fa-lightbulb mr-2"></i>LED Patterns
+                </a>
+                <a href="#servos" class="bg-purple-100 text-purple-700 px-4 py-2 rounded-lg hover:bg-purple-200 transition-colors">
+                    <i class="fas fa-cog mr-2"></i>Servo Control
+                </a>
+                <a href="#sensors" class="bg-orange-100 text-orange-700 px-4 py-2 rounded-lg hover:bg-orange-200 transition-colors">
+                    <i class="fas fa-thermometer-half mr-2"></i>Sensors
+                </a>
+                <a href="#advanced" class="bg-red-100 text-red-700 px-4 py-2 rounded-lg hover:bg-red-200 transition-colors">
+                    <i class="fas fa-rocket mr-2"></i>Advanced
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Basic I/O Example -->
+    <section id="basic" class="py-20 bg-white">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-start">
+                <div>
+                    <div class="flex items-center mb-6">
+                        <div class="bg-blue-100 text-blue-600 rounded-full w-12 h-12 flex items-center justify-center mr-4">
+                            <i class="fas fa-play text-xl"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-3xl font-bold">Basic I/O Operations</h2>
+                            <span class="difficulty-badge difficulty-beginner">Beginner</span>
+                        </div>
+                    </div>
+                    
+                    <p class="text-xl text-gray-600 mb-6">
+                        Learn the fundamentals with digital input/output, analog reading, and basic GPIO control.
+                    </p>
+                    
+                    <div class="bg-blue-50 p-6 rounded-lg mb-6">
+                        <h4 class="font-semibold text-blue-900 mb-2">Hardware Required</h4>
+                        <ul class="text-blue-800 space-y-1">
+                            <li>• ESP32 development board</li>
+                            <li>• LED with 220Ω resistor</li>
+                            <li>• Push button</li>
+                            <li>• Potentiometer (10kΩ)</li>
+                            <li>• Breadboard and jumper wires</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="bg-gray-50 p-6 rounded-lg">
+                        <h4 class="font-semibold mb-3">Wiring Connections</h4>
+                        <ul class="text-gray-700 space-y-2 text-sm">
+                            <li><strong>LED:</strong> GPIO 2 → LED anode → 220Ω resistor → LED cathode → GND</li>
+                            <li><strong>Button:</strong> GPIO 0 → Button pin 1, Button pin 2 → GND</li>
+                            <li><strong>Potentiometer:</strong> GPIO 34 → Potentiometer wiper, VCC → 3.3V, GND → GND</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="code-block text-green-400">
+                    <div class="text-gray-400 text-sm mb-4">
+                        <i class="fas fa-code mr-2"></i>basic_io_example.py
+                    </div>
+                    <pre class="text-sm leading-relaxed"><code>from esp32_gpio_bridge import ESP32GPIO, find_esp32_port
+import time
+
+# Auto-detect ESP32 port
+port = find_esp32_port()
+
+with ESP32GPIO(port) as esp:
+    print(f"Firmware version: {esp.get_version()}")
+    
+    # Digital output - LED control
+    led_pin = 2
+    esp.set_pin_mode(led_pin, "OUT")
+    
+    # Blink LED 5 times
+    for i in range(5):
+        esp.digital_write(led_pin, 1)  # LED ON
+        time.sleep(0.5)
+        esp.digital_write(led_pin, 0)  # LED OFF
+        time.sleep(0.5)
+    
+    # Digital input - Button reading
+    button_pin = 0
+    esp.set_pin_mode(button_pin, "IN_PULLUP")
+    
+    for i in range(5):
+        button_state = esp.digital_read(button_pin)
+        print(f"Button: {'PRESSED' if button_state == 0 else 'RELEASED'}")
+        time.sleep(0.5)
+    
+    # Analog input - Potentiometer
+    pot_pin = 34
+    for i in range(10):
+        raw_value = esp.analog_read(pot_pin)
+        voltage = (raw_value / 4095.0) * 3.3
+        print(f"Potentiometer: {voltage:.2f}V")
+        time.sleep(0.5)</code></pre>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- LED Patterns Example -->
+    <section id="leds" class="py-20 bg-gray-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-start">
+                <div class="order-2 lg:order-1">
+                    <div class="code-block text-green-400">
+                        <div class="text-gray-400 text-sm mb-4">
+                            <i class="fas fa-code mr-2"></i>led_patterns_example.py (Knight Rider)
+                        </div>
+                        <pre class="text-sm leading-relaxed"><code>from esp32_gpio_bridge import ESP32GPIO, find_esp32_port
+import time
+
+# LED configuration
+LED_PINS = [2, 4, 5, 12, 13, 14, 15, 16]
+
+def knight_rider(esp, pins, cycles=3):
+    """Classic Knight Rider / Cylon scanner effect."""
+    for cycle in range(cycles):
+        # Sweep forward
+        for i in range(len(pins)):
+            states = {pin: (1 if idx == i else 0) 
+                     for idx, pin in enumerate(pins)}
+            esp.batch_digital_write(states)
+            time.sleep(0.05)
+        
+        # Sweep backward
+        for i in range(len(pins) - 2, 0, -1):
+            states = {pin: (1 if idx == i else 0) 
+                     for idx, pin in enumerate(pins)}
+            esp.batch_digital_write(states)
+            time.sleep(0.05)
+
+with ESP32GPIO(find_esp32_port()) as esp:
+    # Configure all LEDs as outputs
+    for pin in LED_PINS:
+        esp.set_pin_mode(pin, "OUT")
+    
+    # Run Knight Rider pattern
+    knight_rider(esp, LED_PINS, cycles=5)
+    
+    # Turn all LEDs off
+    esp.batch_digital_write({pin: 0 for pin in LED_PINS})</code></pre>
+                    </div>
+                </div>
+                
+                <div class="order-1 lg:order-2">
+                    <div class="flex items-center mb-6">
+                        <div class="bg-green-100 text-green-600 rounded-full w-12 h-12 flex items-center justify-center mr-4">
+                            <i class="fas fa-lightbulb text-xl"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-3xl font-bold">LED Patterns & Effects</h2>
+                            <span class="difficulty-badge difficulty-intermediate">Intermediate</span>
+                        </div>
+                    </div>
+                    
+                    <p class="text-xl text-gray-600 mb-6">
+                        Create stunning visual effects with multiple LEDs using batch operations for synchronized control.
+                    </p>
+                    
+                    <div class="space-y-4 mb-6">
+                        <div class="flex items-center">
+                            <i class="fas fa-check text-green-500 mr-3"></i>
+                            <span><strong>Knight Rider Effect:</strong> Classic scanner pattern</span>
+                        </div>
+                        <div class="flex items-center">
+                            <i class="fas fa-check text-green-500 mr-3"></i>
+                            <span><strong>Chase Patterns:</strong> Multiple LED trails</span>
+                        </div>
+                        <div class="flex items-center">
+                            <i class="fas fa-check text-green-500 mr-3"></i>
+                            <span><strong>Binary Counter:</strong> Display numbers in binary</span>
+                        </div>
+                        <div class="flex items-center">
+                            <i class="fas fa-check text-green-500 mr-3"></i>
+                            <span><strong>Breathing Effect:</strong> PWM-based fading</span>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-green-50 p-6 rounded-lg">
+                        <h4 class="font-semibold text-green-900 mb-2">Available Patterns</h4>
+                        <ul class="text-green-800 space-y-1 text-sm">
+                            <li>• Knight Rider / Cylon scanner</li>
+                            <li>• Chase patterns with trails</li>
+                            <li>• Wave patterns (build up/collapse)</li>
+                            <li>• Alternating blink patterns</li>
+                            <li>• Binary counter display</li>
+                            <li>• Random sparkle effects</li>
+                            <li>• Breathing effect with PWM</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Servo Control Example -->
+    <section id="servos" class="py-20 bg-white">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-start">
+                <div>
+                    <div class="flex items-center mb-6">
+                        <div class="bg-purple-100 text-purple-600 rounded-full w-12 h-12 flex items-center justify-center mr-4">
+                            <i class="fas fa-cog text-xl"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-3xl font-bold">Servo Motor Control</h2>
+                            <span class="difficulty-badge difficulty-intermediate">Intermediate</span>
+                        </div>
+                    </div>
+                    
+                    <p class="text-xl text-gray-600 mb-6">
+                        Precise servo motor control with PWM, including smooth movements, preset positions, and synchronized multi-servo operations.
+                    </p>
+                    
+                    <div class="bg-purple-50 p-6 rounded-lg mb-6">
+                        <h4 class="font-semibold text-purple-900 mb-2">Servo Specifications</h4>
+                        <ul class="text-purple-800 space-y-1">
+                            <li>• 50Hz PWM frequency (standard servos)</li>
+                            <li>• 1-2ms pulse width (0-180° range)</li>
+                            <li>• 8-bit PWM resolution (0-255)</li>
+                            <li>• Smooth angle transitions</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="bg-gray-50 p-6 rounded-lg">
+                        <h4 class="font-semibold mb-3">Wiring Connections</h4>
+                        <ul class="text-gray-700 space-y-2 text-sm">
+                            <li><strong>Servo 1:</strong> Signal → GPIO 18, VCC → 5V, GND → GND</li>
+                            <li><strong>Servo 2:</strong> Signal → GPIO 19, VCC → 5V, GND → GND</li>
+                            <li><strong>Power:</strong> Use external 5V supply for multiple servos</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="code-block text-green-400">
+                    <div class="text-gray-400 text-sm mb-4">
+                        <i class="fas fa-code mr-2"></i>pwm_servo_control.py
+                    </div>
+                    <pre class="text-sm leading-relaxed"><code>from esp32_gpio_bridge import ESP32GPIO, find_esp32_port
+import time
+
+# Servo configuration
+SERVO_PINS = {'servo1': 18, 'servo2': 19}
+SERVO_FREQ = 50  # 50Hz for standard servos
+
+def angle_to_duty(angle):
+    """Convert angle (0-180) to PWM duty cycle."""
+    if angle < 0: angle = 0
+    elif angle > 180: angle = 180
+    return int(26 + (angle / 180.0) * 102)  # 26-128 range
+
+def smooth_move(esp, pin, start_angle, end_angle, duration=1.0):
+    """Smoothly move servo from start to end angle."""
+    steps = 20
+    delay = duration / steps
+    
+    for i in range(steps + 1):
+        progress = i / steps
+        angle = start_angle + (end_angle - start_angle) * progress
+        duty = angle_to_duty(angle)
+        esp.pwm_write(pin, duty)
+        time.sleep(delay)
+
+with ESP32GPIO(find_esp32_port()) as esp:
+    # Initialize servo with PWM
+    servo_pin = SERVO_PINS['servo1']
+    channel = esp.pwm_init(servo_pin, frequency=SERVO_FREQ, resolution=8)
+    
+    # Center servo
+    esp.pwm_write(servo_pin, angle_to_duty(90))
+    time.sleep(1)
+    
+    # Sweep demo
+    for i in range(3):
+        smooth_move(esp, servo_pin, 0, 180, duration=1.5)
+        smooth_move(esp, servo_pin, 180, 0, duration=1.5)
+    
+    # Preset positions
+    positions = [0, 45, 90, 135, 180, 90]
+    for angle in positions:
+        smooth_move(esp, servo_pin, 90, angle, duration=0.8)
+        time.sleep(1)
+    
+    # Stop PWM
+    esp.pwm_stop(servo_pin)</code></pre>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Sensor Examples -->
+    <section id="sensors" class="py-20 bg-gray-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-start">
+                <div class="order-2 lg:order-1">
+                    <div class="code-block text-green-400">
+                        <div class="text-gray-400 text-sm mb-4">
+                            <i class="fas fa-code mr-2"></i>sensor_monitoring.py
+                        </div>
+                        <pre class="text-sm leading-relaxed"><code>from esp32_gpio_bridge import ESP32GPIO, find_esp32_port
+import time
+import json
+
+def read_temperature_sensor(esp, pin):
+    """Read TMP36 temperature sensor."""
+    raw_value = esp.analog_read(pin)
+    voltage = (raw_value / 4095.0) * 3.3
+    # TMP36: 10mV/°C, 0.5V offset at 0°C
+    temperature = (voltage - 0.5) * 100
+    return temperature
+
+def read_light_sensor(esp, pin):
+    """Read light-dependent resistor (LDR)."""
+    raw_value = esp.analog_read(pin)
+    voltage = (raw_value / 4095.0) * 3.3
+    # Convert to percentage (higher voltage = more light)
+    percentage = (voltage / 3.3) * 100
+    return percentage
+
+def monitor_sensors(esp, duration=60):
+    """Monitor multiple sensors and log data."""
+    sensors = {
+        'temperature': 34,  # TMP36 on GPIO 34
+        'light': 35,        # LDR on GPIO 35
+        'potentiometer': 36 # Potentiometer on GPIO 36
+    }
+    
+    data_log = []
+    start_time = time.time()
+    
+    while time.time() - start_time < duration:
+        timestamp = time.time() - start_time
+        
+        readings = {'timestamp': timestamp}
+        
+        # Read temperature
+        readings['temperature'] = read_temperature_sensor(esp, sensors['temperature'])
+        
+        # Read light level
+        readings['light'] = read_light_sensor(esp, sensors['light'])
+        
+        # Read potentiometer
+        pot_value = esp.analog_read(sensors['potentiometer'])
+        readings['potentiometer'] = (pot_value / 4095.0) * 100
+        
+        data_log.append(readings)
+        
+        # Display readings
+        print(f"T: {readings['temperature']:.1f}°C, "
+              f"L: {readings['light']:.1f}%, "
+              f"P: {readings['potentiometer']:.1f}%")
+        
+        time.sleep(1)
+    
+    # Save data to file
+    with open('sensor_data.json', 'w') as f:
+        json.dump(data_log, f, indent=2)
+    
+    return data_log
+
+with ESP32GPIO(find_esp32_port()) as esp:
+    print("Starting sensor monitoring...")
+    data = monitor_sensors(esp, duration=30)
+    print(f"Collected {len(data)} data points")</code></pre>
+                    </div>
+                </div>
+                
+                <div class="order-1 lg:order-2">
+                    <div class="flex items-center mb-6">
+                        <div class="bg-orange-100 text-orange-600 rounded-full w-12 h-12 flex items-center justify-center mr-4">
+                            <i class="fas fa-thermometer-half text-xl"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-3xl font-bold">Sensor Monitoring</h2>
+                            <span class="difficulty-badge difficulty-intermediate">Intermediate</span>
+                        </div>
+                    </div>
+                    
+                    <p class="text-xl text-gray-600 mb-6">
+                        Monitor multiple sensors simultaneously, log data, and create real-time monitoring dashboards.
+                    </p>
+                    
+                    <div class="space-y-4 mb-6">
+                        <div class="flex items-center">
+                            <i class="fas fa-check text-green-500 mr-3"></i>
+                            <span><strong>Temperature Sensors:</strong> TMP36, DS18B20</span>
+                        </div>
+                        <div class="flex items-center">
+                            <i class="fas fa-check text-green-500 mr-3"></i>
+                            <span><strong>Light Sensors:</strong> LDR, photoresistor</span>
+                        </div>
+                        <div class="flex items-center">
+                            <i class="fas fa-check text-green-500 mr-3"></i>
+                            <span><strong>Motion Sensors:</strong> PIR, ultrasonic</span>
+                        </div>
+                        <div class="flex items-center">
+                            <i class="fas fa-check text-green-500 mr-3"></i>
+                            <span><strong>Data Logging:</strong> JSON, CSV export</span>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-orange-50 p-6 rounded-lg">
+                        <h4 class="font-semibold text-orange-900 mb-2">Sensor Types</h4>
+                        <ul class="text-orange-800 space-y-1 text-sm">
+                            <li>• Analog sensors (potentiometer, LDR, TMP36)</li>
+                            <li>• Digital sensors (button, switch, PIR)</li>
+                            <li>• I2C sensors (accelerometer, gyroscope)</li>
+                            <li>• Specialized sensors (ultrasonic, gas sensors)</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Advanced Examples -->
+    <section id="advanced" class="py-20 bg-white">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-16">
+                <h2 class="text-4xl font-bold text-gray-900 mb-4">Advanced Examples</h2>
+                <p class="text-xl text-gray-600 max-w-3xl mx-auto">
+                    Complex projects combining multiple features: I2C communication, EEPROM storage, and advanced control systems.
+                </p>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                <!-- I2C Sensor Hub -->
+                <div class="example-card bg-white p-8 rounded-xl shadow-lg border border-gray-200">
+                    <div class="text-blue-600 text-4xl mb-4">
+                        <i class="fas fa-network-wired"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold mb-3">I2C Sensor Hub</h3>
+                    <span class="difficulty-badge difficulty-advanced">Advanced</span>
+                    <p class="text-gray-600 mb-4 mt-3">
+                        Connect multiple I2C sensors (accelerometer, gyroscope, magnetometer) and create a comprehensive sensor fusion system.
+                    </p>
+                    <ul class="text-sm text-gray-500 space-y-1">
+                        <li>• Device scanning and detection</li>
+                        <li>• Multi-sensor data fusion</li>
+                        <li>• Real-time data processing</li>
+                        <li>• Calibration and filtering</li>
+                    </ul>
+                </div>
+
+                <!-- Data Logger -->
+                <div class="example-card bg-white p-8 rounded-xl shadow-lg border border-gray-200">
+                    <div class="text-green-600 text-4xl mb-4">
+                        <i class="fas fa-database"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold mb-3">EEPROM Data Logger</h3>
+                    <span class="difficulty-badge difficulty-advanced">Advanced</span>
+                    <p class="text-gray-600 mb-4 mt-3">
+                        Store sensor data in EEPROM, implement circular buffers, and create persistent logging systems.
+                    </p>
+                    <ul class="text-sm text-gray-500 space-y-1">
+                        <li>• Circular buffer implementation</li>
+                        <li>• Data persistence across reboots</li>
+                        <li>• Configuration storage</li>
+                        <li>• Memory management</li>
+                    </ul>
+                </div>
+
+                <!-- Robot Control -->
+                <div class="example-card bg-white p-8 rounded-xl shadow-lg border border-gray-200">
+                    <div class="text-purple-600 text-4xl mb-4">
+                        <i class="fas fa-robot"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold mb-3">Arduino Arm Robot</h3>
+                    <span class="difficulty-badge difficulty-advanced">Advanced</span>
+                    <p class="text-gray-600 mb-4 mt-3">
+                        Control a multi-servo robotic arm with inverse kinematics, path planning, and real-time control.
+                    </p>
+                    <ul class="text-sm text-gray-500 space-y-1">
+                        <li>• Multi-servo coordination</li>
+                        <li>• Inverse kinematics</li>
+                        <li>• Path planning algorithms</li>
+                        <li>• Real-time control loops</li>
+                    </ul>
+                </div>
+
+                <!-- Waveform Generator -->
+                <div class="example-card bg-white p-8 rounded-xl shadow-lg border border-gray-200">
+                    <div class="text-orange-600 text-4xl mb-4">
+                        <i class="fas fa-wave-square"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold mb-3">DAC Waveform Generator</h3>
+                    <span class="difficulty-badge difficulty-intermediate">Intermediate</span>
+                    <p class="text-gray-600 mb-4 mt-3">
+                        Generate various waveforms (sine, square, triangle, sawtooth) using the ESP32's DAC for audio and signal generation.
+                    </p>
+                    <ul class="text-sm text-gray-500 space-y-1">
+                        <li>• Multiple waveform types</li>
+                        <li>• Frequency control</li>
+                        <li>• Amplitude modulation</li>
+                        <li>• Audio tone generation</li>
+                    </ul>
+                </div>
+
+                <!-- Ultrasonic Distance -->
+                <div class="example-card bg-white p-8 rounded-xl shadow-lg border border-gray-200">
+                    <div class="text-red-600 text-4xl mb-4">
+                        <i class="fas fa-radar"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold mb-3">Ultrasonic Distance Meter</h3>
+                    <span class="difficulty-badge difficulty-intermediate">Intermediate</span>
+                    <p class="text-gray-600 mb-4 mt-3">
+                        Measure distances using HC-SR04 ultrasonic sensor with visual indicators and proximity alerts.
+                    </p>
+                    <ul class="text-sm text-gray-500 space-y-1">
+                        <li>• HC-SR04 sensor interface</li>
+                        <li>• Visual zone indicators</li>
+                        <li>• Proximity alarms</li>
+                        <li>• Statistical analysis</li>
+                    </ul>
+                </div>
+
+                <!-- Multi-Sensor Dashboard -->
+                <div class="example-card bg-white p-8 rounded-xl shadow-lg border border-gray-200">
+                    <div class="text-indigo-600 text-4xl mb-4">
+                        <i class="fas fa-tachometer-alt"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold mb-3">Multi-Sensor Dashboard</h3>
+                    <span class="difficulty-badge difficulty-advanced">Advanced</span>
+                    <p class="text-gray-600 mb-4 mt-3">
+                        Create a comprehensive monitoring dashboard with multiple sensors, real-time display, and data visualization.
+                    </p>
+                    <ul class="text-sm text-gray-500 space-y-1">
+                        <li>• Real-time sensor monitoring</li>
+                        <li>• Data visualization</li>
+                        <li>• Alert systems</li>
+                        <li>• Historical data analysis</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Getting Started CTA -->
+    <section class="py-20 bg-blue-600">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <h2 class="text-4xl font-bold text-white mb-4">Ready to Build Your Own Projects?</h2>
+            <p class="text-xl text-blue-100 mb-8 max-w-3xl mx-auto">
+                Start with the basic examples and work your way up to advanced projects. All examples include complete code and wiring instructions.
+            </p>
+            <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                <a href="installation.html" class="bg-white text-blue-600 px-8 py-3 rounded-lg font-semibold hover:bg-blue-50 transition-colors">
+                    <i class="fas fa-download mr-2"></i>Get Started
+                </a>
+                <a href="api.html" class="border-2 border-white text-white px-8 py-3 rounded-lg font-semibold hover:bg-white hover:text-blue-600 transition-colors">
+                    <i class="fas fa-book mr-2"></i>API Reference
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="bg-gray-900 text-white py-12">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div>
+                    <h3 class="text-xl font-bold mb-4">
+                        <i class="fas fa-microchip mr-2"></i>ESP32 GPIO Bridge
+                    </h3>
+                    <p class="text-gray-400 mb-4">
+                        Professional-grade GPIO control from Python. Transform your ESP32 into a powerful hardware interface.
+                    </p>
+                    <div class="flex space-x-4">
+                        <a href="#" class="text-gray-400 hover:text-white">
+                            <i class="fab fa-github text-xl"></i>
+                        </a>
+                        <a href="#" class="text-gray-400 hover:text-white">
+                            <i class="fab fa-python text-xl"></i>
+                        </a>
+                    </div>
+                </div>
+                
+                <div>
+                    <h4 class="text-lg font-semibold mb-4">Documentation</h4>
+                    <ul class="space-y-2 text-gray-400">
+                        <li><a href="features.html" class="hover:text-white">Features</a></li>
+                        <li><a href="examples.html" class="hover:text-white">Examples</a></li>
+                        <li><a href="api.html" class="hover:text-white">API Reference</a></li>
+                        <li><a href="installation.html" class="hover:text-white">Installation</a></li>
+                    </ul>
+                </div>
+                
+                <div>
+                    <h4 class="text-lg font-semibold mb-4">Resources</h4>
+                    <ul class="space-y-2 text-gray-400">
+                        <li><a href="performance.html" class="hover:text-white">Performance</a></li>
+                        <li><a href="architecture.html" class="hover:text-white">Architecture</a></li>
+                        <li><a href="#" class="hover:text-white">GitHub Repository</a></li>
+                        <li><a href="#" class="hover:text-white">Issue Tracker</a></li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="border-t border-gray-800 mt-8 pt-8 text-center text-gray-400">
+                <p>&copy; 2024 ESP32 GPIO Bridge Project. MIT License.</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- JavaScript -->
+    <script>
+        // Mobile menu toggle
+        document.getElementById('mobile-menu-btn').addEventListener('click', function() {
+            const mobileMenu = document.getElementById('mobile-menu');
+            mobileMenu.classList.toggle('hidden');
+        });
+
+        // Smooth scrolling for anchor links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
+            });
+        });
+    </script>
+</body>
+</html>

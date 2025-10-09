@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Performance - ESP32 GPIO Bridge</title>
+    <meta name="description" content="Performance benchmarks and optimization details for ESP32 GPIO Bridge. Learn about the 5-10x performance improvements and professional dual-core architecture.">
+    
+    <!-- TailwindCSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Custom Styles -->
+    <style>
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .code-block {
+            background: #1e293b;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+        }
+        .nav-link {
+            transition: color 0.3s ease;
+        }
+        .nav-link:hover {
+            color: #3b82f6;
+        }
+        .metric-card {
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .metric-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+        .benchmark-table {
+            background: white;
+            border-radius: 0.5rem;
+            overflow: hidden;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+        }
+        .improvement-badge {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-900">
+    <!-- Navigation -->
+    <nav class="bg-white shadow-lg sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <a href="index.html" class="text-2xl font-bold text-blue-600">
+                            <i class="fas fa-microchip mr-2"></i>ESP32 GPIO Bridge
+                        </a>
+                    </div>
+                </div>
+                <div class="hidden md:block">
+                    <div class="ml-10 flex items-baseline space-x-8">
+                        <a href="index.html" class="nav-link text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium">Home</a>
+                        <a href="features.html" class="nav-link text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium">Features</a>
+                        <a href="examples.html" class="nav-link text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium">Examples</a>
+                        <a href="api.html" class="nav-link text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium">API</a>
+                        <a href="installation.html" class="nav-link text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium">Installation</a>
+                        <a href="performance.html" class="nav-link text-blue-600 px-3 py-2 text-sm font-medium">Performance</a>
+                        <a href="architecture.html" class="nav-link text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium">Architecture</a>
+                    </div>
+                </div>
+                <div class="md:hidden">
+                    <button id="mobile-menu-btn" class="text-gray-700 hover:text-blue-600">
+                        <i class="fas fa-bars text-xl"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+        <!-- Mobile menu -->
+        <div id="mobile-menu" class="md:hidden hidden bg-white border-t">
+            <div class="px-2 pt-2 pb-3 space-y-1">
+                <a href="index.html" class="nav-link block px-3 py-2 text-gray-700 hover:text-blue-600">Home</a>
+                <a href="features.html" class="nav-link block px-3 py-2 text-gray-700 hover:text-blue-600">Features</a>
+                <a href="examples.html" class="nav-link block px-3 py-2 text-gray-700 hover:text-blue-600">Examples</a>
+                <a href="api.html" class="nav-link block px-3 py-2 text-gray-700 hover:text-blue-600">API</a>
+                <a href="installation.html" class="nav-link block px-3 py-2 text-gray-700 hover:text-blue-600">Installation</a>
+                <a href="performance.html" class="nav-link block px-3 py-2 text-blue-600">Performance</a>
+                <a href="architecture.html" class="nav-link block px-3 py-2 text-gray-700 hover:text-blue-600">Architecture</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="gradient-bg text-white py-16">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <h1 class="text-4xl md:text-5xl font-bold mb-6">Performance & Optimization</h1>
+            <p class="text-xl text-blue-100 max-w-3xl mx-auto">
+                Professional-grade performance with 5-10x faster command throughput, dual-core architecture, and production-ready optimizations.
+            </p>
+        </div>
+    </section>
+
+    <!-- Performance Overview -->
+    <section class="py-20 bg-white">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-16">
+                <h2 class="text-4xl font-bold text-gray-900 mb-4">Performance Highlights</h2>
+                <p class="text-xl text-gray-600 max-w-3xl mx-auto">
+                    ESP32 GPIO Bridge v0.1.6-beta delivers professional-grade performance with significant improvements over previous versions.
+                </p>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+                <div class="metric-card bg-gradient-to-br from-blue-50 to-blue-100 p-8 rounded-xl border border-blue-200">
+                    <div class="text-center">
+                        <div class="bg-blue-100 text-blue-600 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
+                            <i class="fas fa-rocket text-2xl"></i>
+                        </div>
+                        <h3 class="text-3xl font-bold text-gray-900 mb-2">5-10x</h3>
+                        <p class="text-gray-600 font-semibold">Faster Command Throughput</p>
+                        <p class="text-sm text-gray-500 mt-2">Dual-core FreeRTOS architecture</p>
+                    </div>
+                </div>
+                
+                <div class="metric-card bg-gradient-to-br from-green-50 to-green-100 p-8 rounded-xl border border-green-200">
+                    <div class="text-center">
+                        <div class="bg-green-100 text-green-600 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
+                            <i class="fas fa-microchip text-2xl"></i>
+                        </div>
+                        <h3 class="text-3xl font-bold text-gray-900 mb-2">100%</h3>
+                        <p class="text-gray-600 font-semibold">CPU Utilization</p>
+                        <p class="text-sm text-gray-500 mt-2">Dual-core processing</p>
+                    </div>
+                </div>
+                
+                <div class="metric-card bg-gradient-to-br from-purple-50 to-purple-100 p-8 rounded-xl border border-purple-200">
+                    <div class="text-center">
+                        <div class="bg-purple-100 text-purple-600 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
+                            <i class="fas fa-clock text-2xl"></i>
+                        </div>
+                        <h3 class="text-3xl font-bold text-gray-900 mb-2">50-70ms</h3>
+                        <p class="text-gray-600 font-semibold">Command Latency</p>
+                        <p class="text-sm text-gray-500 mt-2">2-3x faster than v0.1.3</p>
+                    </div>
+                </div>
+                
+                <div class="metric-card bg-gradient-to-br from-orange-50 to-orange-100 p-8 rounded-xl border border-orange-200">
+                    <div class="text-center">
+                        <div class="bg-orange-100 text-orange-600 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
+                            <i class="fas fa-shield-alt text-2xl"></i>
+                        </div>
+                        <h3 class="text-3xl font-bold text-gray-900 mb-2">99.99%</h3>
+                        <p class="text-gray-600 font-semibold">CPU Overhead Reduction</p>
+                        <p class="text-sm text-gray-500 mt-2">Optimized failsafe system</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Version Comparison -->
+    <section class="py-20 bg-gray-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <h2 class="text-4xl font-bold text-gray-900 mb-8 text-center">Performance Evolution</h2>
+            
+            <div class="benchmark-table">
+                <table class="w-full">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Metric</th>
+                            <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">v0.1.3-beta</th>
+                            <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">v0.1.4-beta</th>
+                            <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">v0.1.5-beta</th>
+                            <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">v0.1.6-beta</th>
+                            <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Improvement</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200">
+                        <tr>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Command Throughput</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Single-threaded</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Single-threaded</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Dual-core + queuing</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Dual-core + queuing</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                <span class="improvement-badge">5-10x faster</span>
+                            </td>
+                        </tr>
+                        <tr class="bg-gray-50">
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Write Latency</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">~150ms</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">~50-70ms</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">~50-70ms</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">~50-70ms</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                <span class="improvement-badge">2-3x faster</span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">CPU Utilization</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Single core</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Single core</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Dual core</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Dual core</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                <span class="improvement-badge">100% utilization</span>
+                            </td>
+                        </tr>
+                        <tr class="bg-gray-50">
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Queue Contamination</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Frequent</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Zero</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Zero</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Zero</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                <span class="improvement-badge">100% fixed</span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Memory Usage</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Fragmented</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Stable</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Stable</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Stable</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                <span class="improvement-badge">No fragmentation</span>
+                            </td>
+                        </tr>
+                        <tr class="bg-gray-50">
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Failsafe CPU Usage</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">~10,000/sec</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">1/sec</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">1/sec</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">1/sec</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                <span class="improvement-badge">99.99% reduction</span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Architecture</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Monolithic</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Monolithic</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Dual-core FreeRTOS</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Modular + Dual-core</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                <span class="improvement-badge">Professional</span>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    <!-- v0.1.6-beta Improvements -->
+    <section class="py-20 bg-white">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <h2 class="text-4xl font-bold text-gray-900 mb-8 text-center">v0.1.6-beta: Professional Modular Architecture</h2>
+            
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+                <div>
+                    <h3 class="text-2xl font-semibold mb-6">Complete Code Modularization</h3>
+                    
+                    <div class="space-y-6">
+                        <div class="flex items-start space-x-4">
+                            <div class="bg-blue-100 text-blue-600 rounded-full w-8 h-8 flex items-center justify-center font-semibold text-sm">1</div>
+                            <div>
+                                <h4 class="font-semibold mb-2">Transformed Monolithic Firmware</h4>
+                                <p class="text-gray-600 text-sm">From single 961-line file to 8 specialized modules with 54% reduction in main file size.</p>
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-start space-x-4">
+                            <div class="bg-green-100 text-green-600 rounded-full w-8 h-8 flex items-center justify-center font-semibold text-sm">2</div>
+                            <div>
+                                <h4 class="font-semibold mb-2">Professional Software Architecture</h4>
+                                <p class="text-gray-600 text-sm">Following industry best practices with clean separation of concerns.</p>
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-start space-x-4">
+                            <div class="bg-purple-100 text-purple-600 rounded-full w-8 h-8 flex items-center justify-center font-semibold text-sm">3</div>
+                            <div>
+                                <h4 class="font-semibold mb-2">Enhanced Maintainability</h4>
+                                <p class="text-gray-600 text-sm">Independent development and testing of modules with improved debugging capabilities.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-gray-50 p-8 rounded-xl">
+                    <h4 class="font-semibold mb-4">Module Structure</h4>
+                    <div class="space-y-3">
+                        <div class="flex items-center space-x-3">
+                            <i class="fas fa-file-code text-blue-500"></i>
+                            <span class="text-sm"><strong>config.h</strong> - Configuration constants</span>
+                        </div>
+                        <div class="flex items-center space-x-3">
+                            <i class="fas fa-file-code text-green-500"></i>
+                            <span class="text-sm"><strong>response.h/.cpp</strong> - Response buffer management</span>
+                        </div>
+                        <div class="flex items-center space-x-3">
+                            <i class="fas fa-file-code text-purple-500"></i>
+                            <span class="text-sm"><strong>gpio.h/.cpp</strong> - Digital I/O operations</span>
+                        </div>
+                        <div class="flex items-center space-x-3">
+                            <i class="fas fa-file-code text-orange-500"></i>
+                            <span class="text-sm"><strong>pwm.h/.cpp</strong> - PWM channel allocation</span>
+                        </div>
+                        <div class="flex items-center space-x-3">
+                            <i class="fas fa-file-code text-red-500"></i>
+                            <span class="text-sm"><strong>analog.h/.cpp</strong> - ADC/DAC operations</span>
+                        </div>
+                        <div class="flex items-center space-x-3">
+                            <i class="fas fa-file-code text-indigo-500"></i>
+                            <span class="text-sm"><strong>i2c.h/.cpp</strong> - I2C communication</span>
+                        </div>
+                        <div class="flex items-center space-x-3">
+                            <i class="fas fa-file-code text-pink-500"></i>
+                            <span class="text-sm"><strong>eeprom.h/.cpp</strong> - Persistent storage</span>
+                        </div>
+                        <div class="flex items-center space-x-3">
+                            <i class="fas fa-file-code text-yellow-500"></i>
+                            <span class="text-sm"><strong>i2s.h/.cpp</strong> - I2S audio interface</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- v0.1.5-beta Dual-Core Architecture -->
+    <section class="py-20 bg-gray-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <h2 class="text-4xl font-bold text-gray-900 mb-8 text-center">v0.1.5-beta: Advanced Dual-Core Architecture</h2>
+            
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-12">
+                <div class="bg-white p-8 rounded-xl shadow-lg">
+                    <h3 class="text-2xl font-semibold mb-6">Revolutionary Performance Improvements</h3>
+                    
+                    <div class="space-y-6">
+                        <div class="bg-blue-50 p-6 rounded-lg">
+                            <h4 class="font-semibold text-blue-900 mb-3">5-10x Faster Command Throughput</h4>
+                            <p class="text-blue-800 text-sm">Dual-core FreeRTOS tasks with command queuing system and batch processing (32 commands capacity).</p>
+                        </div>
+                        
+                        <div class="bg-green-50 p-6 rounded-lg">
+                            <h4 class="font-semibold text-green-900 mb-3">Professional Dual-Core Architecture</h4>
+                            <p class="text-green-800 text-sm">Utilizing both ESP32 cores with dedicated tasks and optimized serial responses.</p>
+                        </div>
+                        
+                        <div class="bg-purple-50 p-6 rounded-lg">
+                            <h4 class="font-semibold text-purple-900 mb-3">Thread-Safe Operation</h4>
+                            <p class="text-purple-800 text-sm">Mutex-protected shared data with advanced queue management and circular buffer implementation.</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-white p-8 rounded-xl shadow-lg">
+                    <h3 class="text-2xl font-semibold mb-6">Task Architecture</h3>
+                    
+                    <div class="space-y-6">
+                        <div class="border-l-4 border-blue-500 pl-6">
+                            <h4 class="font-semibold text-blue-900 mb-2">Dedicated Serial Task</h4>
+                            <p class="text-blue-800 text-sm mb-2"><strong>Core 0, Priority 2</strong></p>
+                            <p class="text-blue-700 text-sm">High-responsiveness command processing with optimized response buffer system (512 bytes).</p>
+                        </div>
+                        
+                        <div class="border-l-4 border-green-500 pl-6">
+                            <h4 class="font-semibold text-green-900 mb-2">Dedicated Failsafe Task</h4>
+                            <p class="text-green-800 text-sm mb-2"><strong>Core 1, Priority 1</strong></p>
+                            <p class="text-green-700 text-sm">Independent failsafe monitoring with enhanced task prioritization.</p>
+                        </div>
+                        
+                        <div class="border-l-4 border-purple-500 pl-6">
+                            <h4 class="font-semibold text-purple-900 mb-2">Command Queuing System</h4>
+                            <p class="text-purple-800 text-sm mb-2"><strong>32 Commands Capacity</strong></p>
+                            <p class="text-purple-700 text-sm">Circular buffer implementation with batch processing for optimal throughput.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- v0.1.4-beta Optimizations -->
+    <section class="py-20 bg-white">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <h2 class="text-4xl font-bold text-gray-900 mb-8 text-center">v0.1.4-beta: Production-Ready Optimizations</h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                <div class="bg-gradient-to-br from-green-50 to-green-100 p-8 rounded-xl border border-green-200">
+                    <div class="text-green-600 text-4xl mb-4">
+                        <i class="fas fa-tachometer-alt"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold mb-3">2-3x Faster Write Operations</h3>
+                    <p class="text-gray-600 mb-4">Reduced command latency from 150ms to 50-70ms per command.</p>
+                    <ul class="text-sm text-gray-500 space-y-1">
+                        <li>• Char buffer command parsing</li>
+                        <li>• Eliminated String allocation</li>
+                        <li>• No heap fragmentation</li>
+                    </ul>
+                </div>
+                
+                <div class="bg-gradient-to-br from-blue-50 to-blue-100 p-8 rounded-xl border border-blue-200">
+                    <div class="text-blue-600 text-4xl mb-4">
+                        <i class="fas fa-shield-alt"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold mb-3">Zero Queue Contamination</h3>
+                    <p class="text-gray-600 mb-4">Eliminated background message interference completely.</p>
+                    <ul class="text-sm text-gray-500 space-y-1">
+                        <li>• Advanced error filtering</li>
+                        <li>• Robust ESP32 message handling</li>
+                        <li>• Buffer overflow protection</li>
+                    </ul>
+                </div>
+                
+                <div class="bg-gradient-to-br from-purple-50 to-purple-100 p-8 rounded-xl border border-purple-200">
+                    <div class="text-purple-600 text-4xl mb-4">
+                        <i class="fas fa-microchip"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold mb-3">99.99% CPU Overhead Reduction</h3>
+                    <p class="text-gray-600 mb-4">Optimized failsafe mechanism with same safety, minimal CPU usage.</p>
+                    <ul class="text-sm text-gray-500 space-y-1">
+                        <li>• Optimized failsafe checks</li>
+                        <li>• Enhanced response filtering</li>
+                        <li>• Better error recovery</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Technical Specifications -->
+    <section class="py-20 bg-gray-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <h2 class="text-4xl font-bold text-gray-900 mb-8 text-center">Technical Specifications</h2>
+            
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-12">
+                <div class="bg-white p-8 rounded-xl shadow-lg">
+                    <h3 class="text-2xl font-semibold mb-6">Performance Metrics</h3>
+                    
+                    <div class="space-y-6">
+                        <div class="flex justify-between items-center py-3 border-b border-gray-200">
+                            <span class="font-medium">Command Throughput</span>
+                            <span class="text-blue-600 font-semibold">5-10x faster</span>
+                        </div>
+                        <div class="flex justify-between items-center py-3 border-b border-gray-200">
+                            <span class="font-medium">Write Latency</span>
+                            <span class="text-green-600 font-semibold">50-70ms</span>
+                        </div>
+                        <div class="flex justify-between items-center py-3 border-b border-gray-200">
+                            <span class="font-medium">CPU Utilization</span>
+                            <span class="text-purple-600 font-semibold">100% (dual-core)</span>
+                        </div>
+                        <div class="flex justify-between items-center py-3 border-b border-gray-200">
+                            <span class="font-medium">Queue Capacity</span>
+                            <span class="text-orange-600 font-semibold">32 commands</span>
+                        </div>
+                        <div class="flex justify-between items-center py-3 border-b border-gray-200">
+                            <span class="font-medium">Serial Buffer</span>
+                            <span class="text-red-600 font-semibold">1024 bytes</span>
+                        </div>
+                        <div class="flex justify-between items-center py-3">
+                            <span class="font-medium">Failsafe CPU Usage</span>
+                            <span class="text-indigo-600 font-semibold">1/sec</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-white p-8 rounded-xl shadow-lg">
+                    <h3 class="text-2xl font-semibold mb-6">Architecture Features</h3>
+                    
+                    <div class="space-y-6">
+                        <div class="bg-blue-50 p-4 rounded-lg">
+                            <h4 class="font-semibold text-blue-900 mb-2">Dual-Core FreeRTOS</h4>
+                            <p class="text-blue-800 text-sm">Professional task architecture utilizing both ESP32 cores for maximum performance.</p>
+                        </div>
+                        
+                        <div class="bg-green-50 p-4 rounded-lg">
+                            <h4 class="font-semibold text-green-900 mb-2">Command Queuing</h4>
+                            <p class="text-green-800 text-sm">Circular buffer implementation with batch processing for optimal throughput.</p>
+                        </div>
+                        
+                        <div class="bg-purple-50 p-4 rounded-lg">
+                            <h4 class="font-semibold text-purple-900 mb-2">Thread Safety</h4>
+                            <p class="text-purple-800 text-sm">Mutex-protected shared data access for production-ready reliability.</p>
+                        </div>
+                        
+                        <div class="bg-orange-50 p-4 rounded-lg">
+                            <h4 class="font-semibold text-orange-900 mb-2">Modular Design</h4>
+                            <p class="text-orange-800 text-sm">8 specialized modules with clean separation of concerns and enhanced maintainability.</p>
+                        </div>
+                        
+                        <div class="bg-red-50 p-4 rounded-lg">
+                            <h4 class="font-semibold text-red-900 mb-2">Error Handling</h4>
+                            <p class="text-red-800 text-sm">Advanced error filtering and robust handling of ESP32 system messages.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Optimization Guide -->
+    <section class="py-20 bg-white">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-16">
+                <h2 class="text-4xl font-bold text-gray-900 mb-4">Optimization Best Practices</h2>
+                <p class="text-xl text-gray-600 max-w-3xl mx-auto">
+                    Tips and techniques to get the best performance from your ESP32 GPIO Bridge setup.
+                </p>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div class="bg-gradient-to-br from-blue-50 to-blue-100 p-8 rounded-xl border border-blue-200">
+                    <h3 class="text-xl font-semibold mb-4">Python Library Optimizations</h3>
+                    <ul class="space-y-3 text-sm">
+                        <li class="flex items-start space-x-3">
+                            <i class="fas fa-check text-blue-500 mt-1"></i>
+                            <span>Use batch operations for multiple GPIO writes</span>
+                        </li>
+                        <li class="flex items-start space-x-3">
+                            <i class="fas fa-check text-blue-500 mt-1"></i>
+                            <span>Implement connection pooling for frequent operations</span>
+                        </li>
+                        <li class="flex items-start space-x-3">
+                            <i class="fas fa-check text-blue-500 mt-1"></i>
+                            <span>Use context managers for automatic cleanup</span>
+                        </li>
+                        <li class="flex items-start space-x-3">
+                            <i class="fas fa-check text-blue-500 mt-1"></i>
+                            <span>Minimize serial communication overhead</span>
+                        </li>
+                    </ul>
+                </div>
+                
+                <div class="bg-gradient-to-br from-green-50 to-green-100 p-8 rounded-xl border border-green-200">
+                    <h3 class="text-xl font-semibold mb-4">Hardware Optimizations</h3>
+                    <ul class="space-y-3 text-sm">
+                        <li class="flex items-start space-x-3">
+                            <i class="fas fa-check text-green-500 mt-1"></i>
+                            <span>Use high-quality USB cables for stable communication</span>
+                        </li>
+                        <li class="flex items-start space-x-3">
+                            <i class="fas fa-check text-green-500 mt-1"></i>
+                            <span>Ensure adequate power supply for ESP32</span>
+                        </li>
+                        <li class="flex items-start space-x-3">
+                            <i class="fas fa-check text-green-500 mt-1"></i>
+                            <span>Minimize GPIO pin conflicts and interference</span>
+                        </li>
+                        <li class="flex items-start space-x-3">
+                            <i class="fas fa-check text-green-500 mt-1"></i>
+                            <span>Use appropriate pull-up/pull-down resistors</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="bg-gray-900 text-white py-12">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div>
+                    <h3 class="text-xl font-bold mb-4">
+                        <i class="fas fa-microchip mr-2"></i>ESP32 GPIO Bridge
+                    </h3>
+                    <p class="text-gray-400 mb-4">
+                        Professional-grade GPIO control from Python. Transform your ESP32 into a powerful hardware interface.
+                    </p>
+                    <div class="flex space-x-4">
+                        <a href="#" class="text-gray-400 hover:text-white">
+                            <i class="fab fa-github text-xl"></i>
+                        </a>
+                        <a href="#" class="text-gray-400 hover:text-white">
+                            <i class="fab fa-python text-xl"></i>
+                        </a>
+                    </div>
+                </div>
+                
+                <div>
+                    <h4 class="text-lg font-semibold mb-4">Documentation</h4>
+                    <ul class="space-y-2 text-gray-400">
+                        <li><a href="features.html" class="hover:text-white">Features</a></li>
+                        <li><a href="examples.html" class="hover:text-white">Examples</a></li>
+                        <li><a href="api.html" class="hover:text-white">API Reference</a></li>
+                        <li><a href="installation.html" class="hover:text-white">Installation</a></li>
+                    </ul>
+                </div>
+                
+                <div>
+                    <h4 class="text-lg font-semibold mb-4">Resources</h4>
+                    <ul class="space-y-2 text-gray-400">
+                        <li><a href="performance.html" class="hover:text-white">Performance</a></li>
+                        <li><a href="architecture.html" class="hover:text-white">Architecture</a></li>
+                        <li><a href="#" class="hover:text-white">GitHub Repository</a></li>
+                        <li><a href="#" class="hover:text-white">Issue Tracker</a></li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="border-t border-gray-800 mt-8 pt-8 text-center text-gray-400">
+                <p>&copy; 2024 ESP32 GPIO Bridge Project. MIT License.</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- JavaScript -->
+    <script>
+        // Mobile menu toggle
+        document.getElementById('mobile-menu-btn').addEventListener('click', function() {
+            const mobileMenu = document.getElementById('mobile-menu');
+            mobileMenu.classList.toggle('hidden');
+        });
+
+        // Smooth scrolling for anchor links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
+            });
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Architecture - ESP32 GPIO Bridge</title>
+    <meta name="description" content="Technical architecture deep-dive for ESP32 GPIO Bridge. Learn about the modular firmware design, dual-core FreeRTOS tasks, and professional software architecture.">
+    
+    <!-- TailwindCSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Custom Styles -->
+    <style>
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .code-block {
+            background: #1e293b;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+        }
+        .nav-link {
+            transition: color 0.3s ease;
+        }
+        .nav-link:hover {
+            color: #3b82f6;
+        }
+        .architecture-diagram {
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+            border: 2px solid #cbd5e1;
+            border-radius: 1rem;
+            padding: 2rem;
+        }
+        .module-card {
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .module-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+        .flow-arrow {
+            position: relative;
+        }
+        .flow-arrow::after {
+            content: '→';
+            position: absolute;
+            right: -2rem;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 1.5rem;
+            color: #3b82f6;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-900">
+    <!-- Navigation -->
+    <nav class="bg-white shadow-lg sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <a href="index.html" class="text-2xl font-bold text-blue-600">
+                            <i class="fas fa-microchip mr-2"></i>ESP32 GPIO Bridge
+                        </a>
+                    </div>
+                </div>
+                <div class="hidden md:block">
+                    <div class="ml-10 flex items-baseline space-x-8">
+                        <a href="index.html" class="nav-link text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium">Home</a>
+                        <a href="features.html" class="nav-link text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium">Features</a>
+                        <a href="examples.html" class="nav-link text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium">Examples</a>
+                        <a href="api.html" class="nav-link text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium">API</a>
+                        <a href="installation.html" class="nav-link text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium">Installation</a>
+                        <a href="performance.html" class="nav-link text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium">Performance</a>
+                        <a href="architecture.html" class="nav-link text-blue-600 px-3 py-2 text-sm font-medium">Architecture</a>
+                    </div>
+                </div>
+                <div class="md:hidden">
+                    <button id="mobile-menu-btn" class="text-gray-700 hover:text-blue-600">
+                        <i class="fas fa-bars text-xl"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+        <!-- Mobile menu -->
+        <div id="mobile-menu" class="md:hidden hidden bg-white border-t">
+            <div class="px-2 pt-2 pb-3 space-y-1">
+                <a href="index.html" class="nav-link block px-3 py-2 text-gray-700 hover:text-blue-600">Home</a>
+                <a href="features.html" class="nav-link block px-3 py-2 text-gray-700 hover:text-blue-600">Features</a>
+                <a href="examples.html" class="nav-link block px-3 py-2 text-gray-700 hover:text-blue-600">Examples</a>
+                <a href="api.html" class="nav-link block px-3 py-2 text-gray-700 hover:text-blue-600">API</a>
+                <a href="installation.html" class="nav-link block px-3 py-2 text-gray-700 hover:text-blue-600">Installation</a>
+                <a href="performance.html" class="nav-link block px-3 py-2 text-gray-700 hover:text-blue-600">Performance</a>
+                <a href="architecture.html" class="nav-link block px-3 py-2 text-blue-600">Architecture</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="gradient-bg text-white py-16">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <h1 class="text-4xl md:text-5xl font-bold mb-6">Technical Architecture</h1>
+            <p class="text-xl text-blue-100 max-w-3xl mx-auto">
+                Deep dive into the professional modular firmware design, dual-core FreeRTOS architecture, and advanced system components.
+            </p>
+        </div>
+    </section>
+
+    <!-- System Overview -->
+    <section class="py-20 bg-white">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <h2 class="text-4xl font-bold text-gray-900 mb-8 text-center">System Architecture Overview</h2>
+            
+            <div class="architecture-diagram mb-12">
+                <div class="text-center mb-8">
+                    <h3 class="text-2xl font-semibold text-gray-800 mb-4">ESP32 GPIO Bridge System Architecture</h3>
+                </div>
+                
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 items-center">
+                    <!-- Python Library -->
+                    <div class="bg-white p-6 rounded-xl shadow-lg border border-blue-200">
+                        <div class="text-center">
+                            <div class="bg-blue-100 text-blue-600 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
+                                <i class="fab fa-python text-2xl"></i>
+                            </div>
+                            <h4 class="text-lg font-semibold mb-2">Python Library</h4>
+                            <p class="text-sm text-gray-600">High-level API for GPIO control, PWM, I2C, and more</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Communication Layer -->
+                    <div class="bg-white p-6 rounded-xl shadow-lg border border-green-200 flow-arrow">
+                        <div class="text-center">
+                            <div class="bg-green-100 text-green-600 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
+                                <i class="fas fa-exchange-alt text-2xl"></i>
+                            </div>
+                            <h4 class="text-lg font-semibold mb-2">USB Serial Protocol</h4>
+                            <p class="text-sm text-gray-600">115200 baud, text-based commands with response filtering</p>
+                        </div>
+                    </div>
+                    
+                    <!-- ESP32 Firmware -->
+                    <div class="bg-white p-6 rounded-xl shadow-lg border border-purple-200">
+                        <div class="text-center">
+                            <div class="bg-purple-100 text-purple-600 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
+                                <i class="fas fa-microchip text-2xl"></i>
+                            </div>
+                            <h4 class="text-lg font-semibold mb-2">ESP32 Firmware</h4>
+                            <p class="text-sm text-gray-600">Modular dual-core FreeRTOS architecture</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mt-8 text-center">
+                    <div class="bg-white p-6 rounded-xl shadow-lg border border-orange-200 inline-block">
+                        <div class="flex items-center space-x-4">
+                            <div class="bg-orange-100 text-orange-600 rounded-full w-12 h-12 flex items-center justify-center">
+                                <i class="fas fa-plug text-xl"></i>
+                            </div>
+                            <div class="text-left">
+                                <h4 class="text-lg font-semibold">Hardware Interface</h4>
+                                <p class="text-sm text-gray-600">GPIO pins, PWM, ADC/DAC, I2C, EEPROM</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Modular Firmware Architecture -->
+    <section class="py-20 bg-gray-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <h2 class="text-4xl font-bold text-gray-900 mb-8 text-center">Modular Firmware Architecture (v0.1.6-beta)</h2>
+            <p class="text-xl text-gray-600 mb-12 text-center max-w-3xl mx-auto">
+                Complete transformation from monolithic 961-line file to 8 specialized modules with 54% reduction in main file size.
+            </p>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <!-- Config Module -->
+                <div class="module-card bg-white p-6 rounded-xl shadow-lg border border-blue-200">
+                    <div class="text-center">
+                        <div class="bg-blue-100 text-blue-600 rounded-full w-12 h-12 flex items-center justify-center mx-auto mb-4">
+                            <i class="fas fa-cog text-xl"></i>
+                        </div>
+                        <h3 class="text-lg font-semibold mb-2">config.h</h3>
+                        <p class="text-sm text-gray-600 mb-4">Centralized configuration constants and system parameters</p>
+                        <ul class="text-xs text-gray-500 space-y-1">
+                            <li>• Pin definitions</li>
+                            <li>• Timing constants</li>
+                            <li>• Buffer sizes</li>
+                            <li>• System limits</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <!-- Response Module -->
+                <div class="module-card bg-white p-6 rounded-xl shadow-lg border border-green-200">
+                    <div class="text-center">
+                        <div class="bg-green-100 text-green-600 rounded-full w-12 h-12 flex items-center justify-center mx-auto mb-4">
+                            <i class="fas fa-reply text-xl"></i>
+                        </div>
+                        <h3 class="text-lg font-semibold mb-2">response.h/.cpp</h3>
+                        <p class="text-sm text-gray-600 mb-4">Optimized serial response buffer management</p>
+                        <ul class="text-xs text-gray-500 space-y-1">
+                            <li>• Response buffering</li>
+                            <li>• Message filtering</li>
+                            <li>• Error handling</li>
+                            <li>• Output optimization</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <!-- GPIO Module -->
+                <div class="module-card bg-white p-6 rounded-xl shadow-lg border border-purple-200">
+                    <div class="text-center">
+                        <div class="bg-purple-100 text-purple-600 rounded-full w-12 h-12 flex items-center justify-center mx-auto mb-4">
+                            <i class="fas fa-plug text-xl"></i>
+                        </div>
+                        <h3 class="text-lg font-semibold mb-2">gpio.h/.cpp</h3>
+                        <p class="text-sm text-gray-600 mb-4">Digital I/O operations and pin management</p>
+                        <ul class="text-xs text-gray-500 space-y-1">
+                            <li>• Pin mode control</li>
+                            <li>• Digital read/write</li>
+                            <li>• Pin validation</li>
+                            <li>• Batch operations</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <!-- PWM Module -->
+                <div class="module-card bg-white p-6 rounded-xl shadow-lg border border-orange-200">
+                    <div class="text-center">
+                        <div class="bg-orange-100 text-orange-600 rounded-full w-12 h-12 flex items-center justify-center mx-auto mb-4">
+                            <i class="fas fa-wave-square text-xl"></i>
+                        </div>
+                        <h3 class="text-lg font-semibold mb-2">pwm.h/.cpp</h3>
+                        <p class="text-sm text-gray-600 mb-4">PWM channel allocation and control</p>
+                        <ul class="text-xs text-gray-500 space-y-1">
+                            <li>• Channel management</li>
+                            <li>• Frequency control</li>
+                            <li>• Duty cycle setting</li>
+                            <li>• Resource tracking</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <!-- Analog Module -->
+                <div class="module-card bg-white p-6 rounded-xl shadow-lg border border-red-200">
+                    <div class="text-center">
+                        <div class="bg-red-100 text-red-600 rounded-full w-12 h-12 flex items-center justify-center mx-auto mb-4">
+                            <i class="fas fa-chart-line text-xl"></i>
+                        </div>
+                        <h3 class="text-lg font-semibold mb-2">analog.h/.cpp</h3>
+                        <p class="text-sm text-gray-600 mb-4">ADC/DAC operations with calibration</p>
+                        <ul class="text-xs text-gray-500 space-y-1">
+                            <li>• ADC reading</li>
+                            <li>• DAC output</li>
+                            <li>• Calibration support</li>
+                            <li>• Voltage conversion</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <!-- I2C Module -->
+                <div class="module-card bg-white p-6 rounded-xl shadow-lg border border-indigo-200">
+                    <div class="text-center">
+                        <div class="bg-indigo-100 text-indigo-600 rounded-full w-12 h-12 flex items-center justify-center mx-auto mb-4">
+                            <i class="fas fa-network-wired text-xl"></i>
+                        </div>
+                        <h3 class="text-lg font-semibold mb-2">i2c.h/.cpp</h3>
+                        <p class="text-sm text-gray-600 mb-4">I2C communication protocol</p>
+                        <ul class="text-xs text-gray-500 space-y-1">
+                            <li>• Bus initialization</li>
+                            <li>• Device scanning</li>
+                            <li>• Read/write operations</li>
+                            <li>• Error handling</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <!-- EEPROM Module -->
+                <div class="module-card bg-white p-6 rounded-xl shadow-lg border border-pink-200">
+                    <div class="text-center">
+                        <div class="bg-pink-100 text-pink-600 rounded-full w-12 h-12 flex items-center justify-center mx-auto mb-4">
+                            <i class="fas fa-database text-xl"></i>
+                        </div>
+                        <h3 class="text-lg font-semibold mb-2">eeprom.h/.cpp</h3>
+                        <p class="text-sm text-gray-600 mb-4">Persistent storage operations</p>
+                        <ul class="text-xs text-gray-500 space-y-1">
+                            <li>• Byte operations</li>
+                            <li>• Block operations</li>
+                            <li>• String handling</li>
+                            <li>• Flash management</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <!-- I2S Module -->
+                <div class="module-card bg-white p-6 rounded-xl shadow-lg border border-yellow-200">
+                    <div class="text-center">
+                        <div class="bg-yellow-100 text-yellow-600 rounded-full w-12 h-12 flex items-center justify-center mx-auto mb-4">
+                            <i class="fas fa-volume-up text-xl"></i>
+                        </div>
+                        <h3 class="text-lg font-semibold mb-2">i2s.h/.cpp</h3>
+                        <p class="text-sm text-gray-600 mb-4">I2S audio interface</p>
+                        <ul class="text-xs text-gray-500 space-y-1">
+                            <li>• Audio initialization</li>
+                            <li>• Data transmission</li>
+                            <li>• Sample rate control</li>
+                            <li>• Buffer management</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Dual-Core FreeRTOS Architecture -->
+    <section class="py-20 bg-white">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <h2 class="text-4xl font-bold text-gray-900 mb-8 text-center">Dual-Core FreeRTOS Architecture</h2>
+            <p class="text-xl text-gray-600 mb-12 text-center max-w-3xl mx-auto">
+                Professional dual-core architecture utilizing both ESP32 cores for maximum performance and reliability.
+            </p>
+            
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-12">
+                <!-- Core 0 -->
+                <div class="bg-gradient-to-br from-blue-50 to-blue-100 p-8 rounded-xl border border-blue-200">
+                    <div class="text-center mb-6">
+                        <div class="bg-blue-100 text-blue-600 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
+                            <i class="fas fa-microchip text-2xl"></i>
+                        </div>
+                        <h3 class="text-2xl font-semibold text-blue-900">Core 0 - Serial Processing</h3>
+                        <p class="text-blue-700">High-responsiveness command processing</p>
+                    </div>
+                    
+                    <div class="space-y-4">
+                        <div class="bg-white p-4 rounded-lg">
+                            <h4 class="font-semibold text-blue-900 mb-2">Dedicated Serial Task</h4>
+                            <ul class="text-blue-800 text-sm space-y-1">
+                                <li>• Priority 2 (High)</li>
+                                <li>• Command parsing and execution</li>
+                                <li>• Response generation</li>
+                                <li>• Serial communication management</li>
+                            </ul>
+                        </div>
+                        
+                        <div class="bg-white p-4 rounded-lg">
+                            <h4 class="font-semibold text-blue-900 mb-2">Command Queue Processing</h4>
+                            <ul class="text-blue-800 text-sm space-y-1">
+                                <li>• 32-command circular buffer</li>
+                                <li>• Batch processing optimization</li>
+                                <li>• Priority-based execution</li>
+                                <li>• Error handling and recovery</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Core 1 -->
+                <div class="bg-gradient-to-br from-green-50 to-green-100 p-8 rounded-xl border border-green-200">
+                    <div class="text-center mb-6">
+                        <div class="bg-green-100 text-green-600 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
+                            <i class="fas fa-shield-alt text-2xl"></i>
+                        </div>
+                        <h3 class="text-2xl font-semibold text-green-900">Core 1 - System Monitoring</h3>
+                        <p class="text-green-700">Independent failsafe and system monitoring</p>
+                    </div>
+                    
+                    <div class="space-y-4">
+                        <div class="bg-white p-4 rounded-lg">
+                            <h4 class="font-semibold text-green-900 mb-2">Failsafe Task</h4>
+                            <ul class="text-green-800 text-sm space-y-1">
+                                <li>• Priority 1 (Medium)</li>
+                                <li>• Communication monitoring</li>
+                                <li>• Safety system management</li>
+                                <li>• Pin state protection</li>
+                            </ul>
+                        </div>
+                        
+                        <div class="bg-white p-4 rounded-lg">
+                            <h4 class="font-semibold text-green-900 mb-2">System Health Monitoring</h4>
+                            <ul class="text-green-800 text-sm space-y-1">
+                                <li>• Memory usage tracking</li>
+                                <li>• Task status monitoring</li>
+                                <li>• Performance metrics</li>
+                                <li>• Error logging</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Communication Protocol -->
+    <section class="py-20 bg-gray-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <h2 class="text-4xl font-bold text-gray-900 mb-8 text-center">Communication Protocol</h2>
+            
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-12">
+                <div class="bg-white p-8 rounded-xl shadow-lg">
+                    <h3 class="text-2xl font-semibold mb-6">Protocol Specifications</h3>
+                    
+                    <div class="space-y-6">
+                        <div class="bg-blue-50 p-6 rounded-lg">
+                            <h4 class="font-semibold text-blue-900 mb-3">Serial Configuration</h4>
+                            <ul class="text-blue-800 space-y-2 text-sm">
+                                <li><strong>Baud Rate:</strong> 115200</li>
+                                <li><strong>Data Bits:</strong> 8</li>
+                                <li><strong>Stop Bits:</strong> 1</li>
+                                <li><strong>Parity:</strong> None</li>
+                                <li><strong>Flow Control:</strong> None</li>
+                            </ul>
+                        </div>
+                        
+                        <div class="bg-green-50 p-6 rounded-lg">
+                            <h4 class="font-semibold text-green-900 mb-3">Message Format</h4>
+                            <div class="code-block text-green-400">
+                                <pre class="text-sm"><code>&lt;COMMAND&gt;          # Command format
+&lt;RESPONSE&gt;         # Response format
+&lt;ERROR:message&gt;    # Error format</code></pre>
+                            </div>
+                        </div>
+                        
+                        <div class="bg-purple-50 p-6 rounded-lg">
+                            <h4 class="font-semibold text-purple-900 mb-3">Response Filtering</h4>
+                            <ul class="text-purple-800 space-y-1 text-sm">
+                                <li>• Filters PONG responses</li>
+                                <li>• Removes ESP32 system messages</li>
+                                <li>• Handles stale ERROR messages</li>
+                                <li>• Optimizes serial throughput</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-white p-8 rounded-xl shadow-lg">
+                    <h3 class="text-2xl font-semibold mb-6">Command Categories</h3>
+                    
+                    <div class="space-y-6">
+                        <div class="border-l-4 border-blue-500 pl-6">
+                            <h4 class="font-semibold text-blue-900 mb-2">System Commands</h4>
+                            <ul class="text-blue-800 space-y-1 text-sm">
+                                <li>• IDENTIFY - Device identification</li>
+                                <li>• VERSION - Firmware version</li>
+                                <li>• PING - Keep-alive</li>
+                                <li>• STATUS - System status</li>
+                            </ul>
+                        </div>
+                        
+                        <div class="border-l-4 border-green-500 pl-6">
+                            <h4 class="font-semibold text-green-900 mb-2">GPIO Commands</h4>
+                            <ul class="text-green-800 space-y-1 text-sm">
+                                <li>• MODE - Set pin mode</li>
+                                <li>• WRITE - Digital write</li>
+                                <li>• READ - Digital read</li>
+                                <li>• BATCH_WRITE - Multiple pins</li>
+                            </ul>
+                        </div>
+                        
+                        <div class="border-l-4 border-purple-500 pl-6">
+                            <h4 class="font-semibold text-purple-900 mb-2">Advanced Commands</h4>
+                            <ul class="text-purple-800 space-y-1 text-sm">
+                                <li>• PWM_INIT/WRITE/STOP</li>
+                                <li>• AREAD/AWRITE</li>
+                                <li>• I2C_INIT/SCAN/READ/WRITE</li>
+                                <li>• EEPROM operations</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Memory Management -->
+    <section class="py-20 bg-white">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <h2 class="text-4xl font-bold text-gray-900 mb-8 text-center">Memory Management & Optimization</h2>
+            
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div class="bg-gradient-to-br from-blue-50 to-blue-100 p-8 rounded-xl border border-blue-200">
+                    <div class="text-center mb-6">
+                        <div class="bg-blue-100 text-blue-600 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
+                            <i class="fas fa-memory text-2xl"></i>
+                        </div>
+                        <h3 class="text-xl font-semibold text-blue-900">Heap Management</h3>
+                    </div>
+                    
+                    <ul class="text-blue-800 space-y-2 text-sm">
+                        <li>• Char buffer parsing (no String allocation)</li>
+                        <li>• Fixed-size response buffers</li>
+                        <li>• Circular buffer implementation</li>
+                        <li>• Memory pool for frequent allocations</li>
+                        <li>• Garbage collection optimization</li>
+                    </ul>
+                </div>
+                
+                <div class="bg-gradient-to-br from-green-50 to-green-100 p-8 rounded-xl border border-green-200">
+                    <div class="text-center mb-6">
+                        <div class="bg-green-100 text-green-600 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
+                            <i class="fas fa-tachometer-alt text-2xl"></i>
+                        </div>
+                        <h3 class="text-xl font-semibold text-green-900">Performance Optimization</h3>
+                    </div>
+                    
+                    <ul class="text-green-800 space-y-2 text-sm">
+                        <li>• O(1) PWM channel lookup</li>
+                        <li>• Batch operation support</li>
+                        <li>• Single-call response output</li>
+                        <li>• Reduced serial overhead</li>
+                        <li>• Optimized task scheduling</li>
+                    </ul>
+                </div>
+                
+                <div class="bg-gradient-to-br from-purple-50 to-purple-100 p-8 rounded-xl border border-purple-200">
+                    <div class="text-center mb-6">
+                        <div class="bg-purple-100 text-purple-600 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
+                            <i class="fas fa-shield-alt text-2xl"></i>
+                        </div>
+                        <h3 class="text-xl font-semibold text-purple-900">Safety & Reliability</h3>
+                    </div>
+                    
+                    <ul class="text-purple-800 space-y-2 text-sm">
+                        <li>• Mutex-protected shared data</li>
+                        <li>• Thread-safe operations</li>
+                        <li>• Buffer overflow protection</li>
+                        <li>• Error recovery mechanisms</li>
+                        <li>• Watchdog integration</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Development Workflow -->
+    <section class="py-20 bg-gray-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <h2 class="text-4xl font-bold text-gray-900 mb-8 text-center">Development Workflow & Benefits</h2>
+            
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-12">
+                <div class="bg-white p-8 rounded-xl shadow-lg">
+                    <h3 class="text-2xl font-semibold mb-6">Modular Development Benefits</h3>
+                    
+                    <div class="space-y-6">
+                        <div class="flex items-start space-x-4">
+                            <div class="bg-blue-100 text-blue-600 rounded-full w-8 h-8 flex items-center justify-center font-semibold text-sm">1</div>
+                            <div>
+                                <h4 class="font-semibold mb-2">Enhanced Maintainability</h4>
+                                <p class="text-gray-600 text-sm">Bug fixes isolated to specific modules, easier debugging and testing.</p>
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-start space-x-4">
+                            <div class="bg-green-100 text-green-600 rounded-full w-8 h-8 flex items-center justify-center font-semibold text-sm">2</div>
+                            <div>
+                                <h4 class="font-semibold mb-2">Parallel Development</h4>
+                                <p class="text-gray-600 text-sm">Multiple developers can work on different modules simultaneously.</p>
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-start space-x-4">
+                            <div class="bg-purple-100 text-purple-600 rounded-full w-8 h-8 flex items-center justify-center font-semibold text-sm">3</div>
+                            <div>
+                                <h4 class="font-semibold mb-2">Professional Architecture</h4>
+                                <p class="text-gray-600 text-sm">Industry-standard modular design with clean separation of concerns.</p>
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-start space-x-4">
+                            <div class="bg-orange-100 text-orange-600 rounded-full w-8 h-8 flex items-center justify-center font-semibold text-sm">4</div>
+                            <div>
+                                <h4 class="font-semibold mb-2">Enhanced Testing</h4>
+                                <p class="text-gray-600 text-sm">Each module can be unit tested independently with better coverage.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-white p-8 rounded-xl shadow-lg">
+                    <h3 class="text-2xl font-semibold mb-6">Code Organization</h3>
+                    
+                    <div class="code-block text-green-400">
+                        <div class="text-gray-400 text-sm mb-4">
+                            <i class="fas fa-code mr-2"></i>Module Structure Example
+                        </div>
+                        <pre class="text-sm leading-relaxed"><code>firmware/
+├── firmware.ino          # Main file (54% smaller)
+├── config.h              # Configuration constants
+├── response.h/.cpp       # Response management
+├── gpio.h/.cpp          # GPIO operations
+├── pwm.h/.cpp           # PWM control
+├── analog.h/.cpp        # ADC/DAC operations
+├── i2c.h/.cpp           # I2C communication
+├── eeprom.h/.cpp        # Persistent storage
+└── i2s.h/.cpp           # Audio interface
+
+# Each module is self-contained with:
+# - Clear interface definitions
+# - Independent functionality
+# - Minimal dependencies
+# - Comprehensive error handling</code></pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Future Roadmap -->
+    <section class="py-20 bg-white">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <h2 class="text-4xl font-bold text-gray-900 mb-8 text-center">Future Architecture Enhancements</h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                <div class="bg-gradient-to-br from-blue-50 to-blue-100 p-8 rounded-xl border border-blue-200">
+                    <div class="text-center mb-6">
+                        <div class="bg-blue-100 text-blue-600 rounded-full w-12 h-12 flex items-center justify-center mx-auto mb-4">
+                            <i class="fas fa-wifi text-xl"></i>
+                        </div>
+                        <h3 class="text-lg font-semibold text-blue-900">Network Module</h3>
+                    </div>
+                    <p class="text-blue-800 text-sm">WiFi and Ethernet support for remote GPIO control and monitoring.</p>
+                </div>
+                
+                <div class="bg-gradient-to-br from-green-50 to-green-100 p-8 rounded-xl border border-green-200">
+                    <div class="text-center mb-6">
+                        <div class="bg-green-100 text-green-600 rounded-full w-12 h-12 flex items-center justify-center mx-auto mb-4">
+                            <i class="fas fa-cloud text-xl"></i>
+                        </div>
+                        <h3 class="text-lg font-semibold text-green-900">Cloud Integration</h3>
+                    </div>
+                    <p class="text-green-800 text-sm">MQTT and HTTP client support for IoT cloud platforms.</p>
+                </div>
+                
+                <div class="bg-gradient-to-br from-purple-50 to-purple-100 p-8 rounded-xl border border-purple-200">
+                    <div class="text-center mb-6">
+                        <div class="bg-purple-100 text-purple-600 rounded-full w-12 h-12 flex items-center justify-center mx-auto mb-4">
+                            <i class="fas fa-chart-bar text-xl"></i>
+                        </div>
+                        <h3 class="text-lg font-semibold text-purple-900">Analytics Module</h3>
+                    </div>
+                    <p class="text-purple-800 text-sm">Built-in data logging and performance analytics capabilities.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="bg-gray-900 text-white py-12">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div>
+                    <h3 class="text-xl font-bold mb-4">
+                        <i class="fas fa-microchip mr-2"></i>ESP32 GPIO Bridge
+                    </h3>
+                    <p class="text-gray-400 mb-4">
+                        Professional-grade GPIO control from Python. Transform your ESP32 into a powerful hardware interface.
+                    </p>
+                    <div class="flex space-x-4">
+                        <a href="#" class="text-gray-400 hover:text-white">
+                            <i class="fab fa-github text-xl"></i>
+                        </a>
+                        <a href="#" class="text-gray-400 hover:text-white">
+                            <i class="fab fa-python text-xl"></i>
+                        </a>
+                    </div>
+                </div>
+                
+                <div>
+                    <h4 class="text-lg font-semibold mb-4">Documentation</h4>
+                    <ul class="space-y-2 text-gray-400">
+                        <li><a href="features.html" class="hover:text-white">Features</a></li>
+                        <li><a href="examples.html" class="hover:text-white">Examples</a></li>
+                        <li><a href="api.html" class="hover:text-white">API Reference</a></li>
+                        <li><a href="installation.html" class="hover:text-white">Installation</a></li>
+                    </ul>
+                </div>
+                
+                <div>
+                    <h4 class="text-lg font-semibold mb-4">Resources</h4>
+                    <ul class="space-y-2 text-gray-400">
+                        <li><a href="performance.html" class="hover:text-white">Performance</a></li>
+                        <li><a href="architecture.html" class="hover:text-white">Architecture</a></li>
+                        <li><a href="#" class="hover:text-white">GitHub Repository</a></li>
+                        <li><a href="#" class="hover:text-white">Issue Tracker</a></li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="border-t border-gray-800 mt-8 pt-8 text-center text-gray-400">
+                <p>&copy; 2024 ESP32 GPIO Bridge Project. MIT License.</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- JavaScript -->
+    <script>
+        // Mobile menu toggle
+        document.getElementById('mobile-menu-btn').addEventListener('click', function() {
+            const mobileMenu = document.getElementById('mobile-menu');
+            mobileMenu.classList.toggle('hidden');
+        });
+
+        // Smooth scrolling for anchor links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
+            });
+        });
+    </script>
+</body>
+</html>

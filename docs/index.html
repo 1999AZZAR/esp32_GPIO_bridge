@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESP32 GPIO Bridge - Professional GPIO Control from Python</title>
+    <meta name="description" content="Transform your ESP32 into a powerful, PC-controlled hardware interface. Professional-grade GPIO control, PWM, I2C communication, and more via Python.">
+    
+    <!-- TailwindCSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Custom Styles -->
+    <style>
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .code-block {
+            background: #1e293b;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+        }
+        .feature-card {
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .feature-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+        .nav-link {
+            transition: color 0.3s ease;
+        }
+        .nav-link:hover {
+            color: #3b82f6;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-900">
+    <!-- Navigation -->
+    <nav class="bg-white shadow-lg sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <h1 class="text-2xl font-bold text-blue-600">
+                            <i class="fas fa-microchip mr-2"></i>ESP32 GPIO Bridge
+                        </h1>
+                    </div>
+                </div>
+                <div class="hidden md:block">
+                    <div class="ml-10 flex items-baseline space-x-8">
+                        <a href="#home" class="nav-link text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium">Home</a>
+                        <a href="features.html" class="nav-link text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium">Features</a>
+                        <a href="examples.html" class="nav-link text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium">Examples</a>
+                        <a href="api.html" class="nav-link text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium">API</a>
+                        <a href="installation.html" class="nav-link text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium">Installation</a>
+                        <a href="performance.html" class="nav-link text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium">Performance</a>
+                        <a href="architecture.html" class="nav-link text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium">Architecture</a>
+                    </div>
+                </div>
+                <div class="md:hidden">
+                    <button id="mobile-menu-btn" class="text-gray-700 hover:text-blue-600">
+                        <i class="fas fa-bars text-xl"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+        <!-- Mobile menu -->
+        <div id="mobile-menu" class="md:hidden hidden bg-white border-t">
+            <div class="px-2 pt-2 pb-3 space-y-1">
+                <a href="#home" class="nav-link block px-3 py-2 text-gray-700 hover:text-blue-600">Home</a>
+                <a href="features.html" class="nav-link block px-3 py-2 text-gray-700 hover:text-blue-600">Features</a>
+                <a href="examples.html" class="nav-link block px-3 py-2 text-gray-700 hover:text-blue-600">Examples</a>
+                <a href="api.html" class="nav-link block px-3 py-2 text-gray-700 hover:text-blue-600">API</a>
+                <a href="installation.html" class="nav-link block px-3 py-2 text-gray-700 hover:text-blue-600">Installation</a>
+                <a href="performance.html" class="nav-link block px-3 py-2 text-gray-700 hover:text-blue-600">Performance</a>
+                <a href="architecture.html" class="nav-link block px-3 py-2 text-gray-700 hover:text-blue-600">Architecture</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section id="home" class="gradient-bg text-white py-20">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <h1 class="text-5xl md:text-6xl font-bold mb-6">
+                ESP32 GPIO Bridge
+            </h1>
+            <p class="text-xl md:text-2xl mb-8 text-blue-100 max-w-3xl mx-auto">
+                Transform your ESP32 into a powerful, PC-controlled hardware interface. Professional-grade GPIO control, PWM, I2C communication, and more via Python.
+            </p>
+            <div class="flex flex-col sm:flex-row gap-4 justify-center items-center">
+                <a href="installation.html" class="bg-white text-blue-600 px-8 py-3 rounded-lg font-semibold hover:bg-blue-50 transition-colors">
+                    <i class="fas fa-download mr-2"></i>Get Started
+                </a>
+                <a href="examples.html" class="border-2 border-white text-white px-8 py-3 rounded-lg font-semibold hover:bg-white hover:text-blue-600 transition-colors">
+                    <i class="fas fa-play mr-2"></i>View Examples
+                </a>
+            </div>
+            <div class="mt-12 text-sm text-blue-200">
+                <i class="fas fa-tag mr-1"></i>Version 0.1.6-beta • 
+                <i class="fas fa-code-branch mr-1"></i>Professional Modular Architecture • 
+                <i class="fas fa-rocket mr-1"></i>5-10x Performance Boost
+            </div>
+        </div>
+    </section>
+
+    <!-- Key Features -->
+    <section class="py-20 bg-white">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-16">
+                <h2 class="text-4xl font-bold text-gray-900 mb-4">Powerful Hardware Control</h2>
+                <p class="text-xl text-gray-600 max-w-3xl mx-auto">
+                    Complete GPIO control from Python with professional-grade performance and safety features.
+                </p>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                <!-- GPIO Control -->
+                <div class="feature-card bg-gray-50 p-8 rounded-xl border border-gray-200">
+                    <div class="text-blue-600 text-4xl mb-4">
+                        <i class="fas fa-plug"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold mb-3">Digital GPIO Control</h3>
+                    <p class="text-gray-600 mb-4">Complete control over 40 GPIO pins with input/output modes, pull-up resistors, and batch operations.</p>
+                    <ul class="text-sm text-gray-500 space-y-1">
+                        <li><i class="fas fa-check text-green-500 mr-2"></i>40 GPIO pins (0-39)</li>
+                        <li><i class="fas fa-check text-green-500 mr-2"></i>Input/Output modes</li>
+                        <li><i class="fas fa-check text-green-500 mr-2"></i>Batch operations</li>
+                    </ul>
+                </div>
+
+                <!-- PWM Control -->
+                <div class="feature-card bg-gray-50 p-8 rounded-xl border border-gray-200">
+                    <div class="text-blue-600 text-4xl mb-4">
+                        <i class="fas fa-wave-square"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold mb-3">Hardware PWM</h3>
+                    <p class="text-gray-600 mb-4">Up to 16 PWM channels with configurable frequency and resolution for precise control.</p>
+                    <ul class="text-sm text-gray-500 space-y-1">
+                        <li><i class="fas fa-check text-green-500 mr-2"></i>16 PWM channels</li>
+                        <li><i class="fas fa-check text-green-500 mr-2"></i>1-40kHz frequency</li>
+                        <li><i class="fas fa-check text-green-500 mr-2"></i>1-16 bit resolution</li>
+                    </ul>
+                </div>
+
+                <!-- Analog I/O -->
+                <div class="feature-card bg-gray-50 p-8 rounded-xl border border-gray-200">
+                    <div class="text-blue-600 text-4xl mb-4">
+                        <i class="fas fa-chart-line"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold mb-3">Analog I/O</h3>
+                    <p class="text-gray-600 mb-4">12-bit ADC input and 8-bit DAC output for precise analog signal processing.</p>
+                    <ul class="text-sm text-gray-500 space-y-1">
+                        <li><i class="fas fa-check text-green-500 mr-2"></i>12-bit ADC (0-4095)</li>
+                        <li><i class="fas fa-check text-green-500 mr-2"></i>8-bit DAC (0-255)</li>
+                        <li><i class="fas fa-check text-green-500 mr-2"></i>Calibration support</li>
+                    </ul>
+                </div>
+
+                <!-- I2C Communication -->
+                <div class="feature-card bg-gray-50 p-8 rounded-xl border border-gray-200">
+                    <div class="text-blue-600 text-4xl mb-4">
+                        <i class="fas fa-network-wired"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold mb-3">I2C Communication</h3>
+                    <p class="text-gray-600 mb-4">Full I2C bus control with device scanning and data transfer capabilities.</p>
+                    <ul class="text-sm text-gray-500 space-y-1">
+                        <li><i class="fas fa-check text-green-500 mr-2"></i>Device scanning</li>
+                        <li><i class="fas fa-check text-green-500 mr-2"></i>Read/Write operations</li>
+                        <li><i class="fas fa-check text-green-500 mr-2"></i>Configurable frequency</li>
+                    </ul>
+                </div>
+
+                <!-- EEPROM Storage -->
+                <div class="feature-card bg-gray-50 p-8 rounded-xl border border-gray-200">
+                    <div class="text-blue-600 text-4xl mb-4">
+                        <i class="fas fa-database"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold mb-3">EEPROM Storage</h3>
+                    <p class="text-gray-600 mb-4">512 bytes of persistent storage for configuration and data persistence.</p>
+                    <ul class="text-sm text-gray-500 space-y-1">
+                        <li><i class="fas fa-check text-green-500 mr-2"></i>512 bytes storage</li>
+                        <li><i class="fas fa-check text-green-500 mr-2"></i>Block operations</li>
+                        <li><i class="fas fa-check text-green-500 mr-2"></i>String support</li>
+                    </ul>
+                </div>
+
+                <!-- Performance -->
+                <div class="feature-card bg-gray-50 p-8 rounded-xl border border-gray-200">
+                    <div class="text-blue-600 text-4xl mb-4">
+                        <i class="fas fa-tachometer-alt"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold mb-3">High Performance</h3>
+                    <p class="text-gray-600 mb-4">Professional dual-core architecture with 5-10x faster command throughput.</p>
+                    <ul class="text-sm text-gray-500 space-y-1">
+                        <li><i class="fas fa-check text-green-500 mr-2"></i>5-10x faster</li>
+                        <li><i class="fas fa-check text-green-500 mr-2"></i>Dual-core FreeRTOS</li>
+                        <li><i class="fas fa-check text-green-500 mr-2"></i>Command queuing</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Quick Start -->
+    <section class="py-20 bg-gray-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-16">
+                <h2 class="text-4xl font-bold text-gray-900 mb-4">Quick Start</h2>
+                <p class="text-xl text-gray-600 max-w-3xl mx-auto">
+                    Get up and running in minutes with our simple installation and basic example.
+                </p>
+            </div>
+            
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+                <div>
+                    <h3 class="text-2xl font-semibold mb-6">Installation</h3>
+                    <div class="space-y-4">
+                        <div class="flex items-start space-x-3">
+                            <div class="bg-blue-100 text-blue-600 rounded-full w-8 h-8 flex items-center justify-center font-semibold text-sm">1</div>
+                            <div>
+                                <h4 class="font-semibold">Install Python Library</h4>
+                                <p class="text-gray-600">Install the ESP32 GPIO Bridge library via pip.</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start space-x-3">
+                            <div class="bg-blue-100 text-blue-600 rounded-full w-8 h-8 flex items-center justify-center font-semibold text-sm">2</div>
+                            <div>
+                                <h4 class="font-semibold">Flash ESP32 Firmware</h4>
+                                <p class="text-gray-600">Upload the modular firmware to your ESP32 board.</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start space-x-3">
+                            <div class="bg-blue-100 text-blue-600 rounded-full w-8 h-8 flex items-center justify-center font-semibold text-sm">3</div>
+                            <div>
+                                <h4 class="font-semibold">Start Controlling Hardware</h4>
+                                <p class="text-gray-600">Connect and control GPIO pins from Python.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-8">
+                        <a href="installation.html" class="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors">
+                            <i class="fas fa-book mr-2"></i>Detailed Installation Guide
+                        </a>
+                    </div>
+                </div>
+                
+                <div class="code-block text-green-400">
+                    <div class="text-gray-400 text-sm mb-4">
+                        <i class="fas fa-code mr-2"></i>Basic Example
+                    </div>
+                    <pre class="text-sm leading-relaxed"><code>from esp32_gpio_bridge import ESP32GPIO, find_esp32_port
+
+# Auto-detect ESP32 port
+port = find_esp32_port()
+
+# Connect using context manager
+with ESP32GPIO(port) as esp:
+    print(f"Firmware version: {esp.get_version()}")
+    
+    # Digital output - LED control
+    esp.set_pin_mode(2, "OUT")
+    esp.digital_write(2, 1)  # LED ON
+    
+    # Analog input - Sensor reading
+    sensor_value = esp.analog_read(34)
+    voltage = (sensor_value / 4095.0) * 3.3
+    print(f"Sensor voltage: {voltage:.2f}V")</code></pre>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Performance Highlights -->
+    <section class="py-20 bg-white">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-16">
+                <h2 class="text-4xl font-bold text-gray-900 mb-4">Performance Highlights</h2>
+                <p class="text-xl text-gray-600 max-w-3xl mx-auto">
+                    Professional-grade performance with significant improvements in v0.1.6-beta.
+                </p>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+                <div class="text-center">
+                    <div class="bg-blue-100 text-blue-600 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
+                        <i class="fas fa-rocket text-2xl"></i>
+                    </div>
+                    <h3 class="text-2xl font-bold text-gray-900 mb-2">5-10x</h3>
+                    <p class="text-gray-600">Faster Command Throughput</p>
+                </div>
+                
+                <div class="text-center">
+                    <div class="bg-green-100 text-green-600 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
+                        <i class="fas fa-microchip text-2xl"></i>
+                    </div>
+                    <h3 class="text-2xl font-bold text-gray-900 mb-2">Dual-Core</h3>
+                    <p class="text-gray-600">FreeRTOS Architecture</p>
+                </div>
+                
+                <div class="text-center">
+                    <div class="bg-purple-100 text-purple-600 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
+                        <i class="fas fa-layer-group text-2xl"></i>
+                    </div>
+                    <h3 class="text-2xl font-bold text-gray-900 mb-2">8 Modules</h3>
+                    <p class="text-gray-600">Modular Firmware Design</p>
+                </div>
+                
+                <div class="text-center">
+                    <div class="bg-orange-100 text-orange-600 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
+                        <i class="fas fa-shield-alt text-2xl"></i>
+                    </div>
+                    <h3 class="text-2xl font-bold text-gray-900 mb-2">Smart</h3>
+                    <p class="text-gray-600">Failsafe System</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="py-20 bg-blue-600">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <h2 class="text-4xl font-bold text-white mb-4">Ready to Get Started?</h2>
+            <p class="text-xl text-blue-100 mb-8 max-w-3xl mx-auto">
+                Transform your ESP32 into a powerful hardware interface with professional-grade Python control.
+            </p>
+            <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                <a href="installation.html" class="bg-white text-blue-600 px-8 py-3 rounded-lg font-semibold hover:bg-blue-50 transition-colors">
+                    <i class="fas fa-download mr-2"></i>Install Now
+                </a>
+                <a href="examples.html" class="border-2 border-white text-white px-8 py-3 rounded-lg font-semibold hover:bg-white hover:text-blue-600 transition-colors">
+                    <i class="fas fa-code mr-2"></i>View Examples
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="bg-gray-900 text-white py-12">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div>
+                    <h3 class="text-xl font-bold mb-4">
+                        <i class="fas fa-microchip mr-2"></i>ESP32 GPIO Bridge
+                    </h3>
+                    <p class="text-gray-400 mb-4">
+                        Professional-grade GPIO control from Python. Transform your ESP32 into a powerful hardware interface.
+                    </p>
+                    <div class="flex space-x-4">
+                        <a href="#" class="text-gray-400 hover:text-white">
+                            <i class="fab fa-github text-xl"></i>
+                        </a>
+                        <a href="#" class="text-gray-400 hover:text-white">
+                            <i class="fab fa-python text-xl"></i>
+                        </a>
+                    </div>
+                </div>
+                
+                <div>
+                    <h4 class="text-lg font-semibold mb-4">Documentation</h4>
+                    <ul class="space-y-2 text-gray-400">
+                        <li><a href="features.html" class="hover:text-white">Features</a></li>
+                        <li><a href="examples.html" class="hover:text-white">Examples</a></li>
+                        <li><a href="api.html" class="hover:text-white">API Reference</a></li>
+                        <li><a href="installation.html" class="hover:text-white">Installation</a></li>
+                    </ul>
+                </div>
+                
+                <div>
+                    <h4 class="text-lg font-semibold mb-4">Resources</h4>
+                    <ul class="space-y-2 text-gray-400">
+                        <li><a href="performance.html" class="hover:text-white">Performance</a></li>
+                        <li><a href="architecture.html" class="hover:text-white">Architecture</a></li>
+                        <li><a href="#" class="hover:text-white">GitHub Repository</a></li>
+                        <li><a href="#" class="hover:text-white">Issue Tracker</a></li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="border-t border-gray-800 mt-8 pt-8 text-center text-gray-400">
+                <p>&copy; 2024 ESP32 GPIO Bridge Project. MIT License.</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- JavaScript -->
+    <script>
+        // Mobile menu toggle
+        document.getElementById('mobile-menu-btn').addEventListener('click', function() {
+            const mobileMenu = document.getElementById('mobile-menu');
+            mobileMenu.classList.toggle('hidden');
+        });
+
+        // Smooth scrolling for anchor links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
+            });
+        });
+    </script>
+</body>
+</html>
