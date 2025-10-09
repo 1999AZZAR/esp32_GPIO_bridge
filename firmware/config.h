@@ -6,7 +6,7 @@
 // ============================================================================
 
 // Firmware Version
-#define FW_VERSION "0.1.5-beta"
+#define FW_VERSION "0.1.6-beta"
 
 // Serial Communication
 #define BAUD_RATE 115200

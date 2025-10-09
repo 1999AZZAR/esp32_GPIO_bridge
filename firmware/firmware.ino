@@ -11,6 +11,12 @@
 #include "freertos/semphr.h"
 #include "config.h"
 #include "response.h"
+#include "gpio.h"
+#include "pwm.h"
+#include "analog.h"
+#include "i2c.h"
+#include "eeprom.h"
+#include "i2s.h"
 
 unsigned long lastCommandTime = 0;
 unsigned long lastPingTime = 0;
@@ -26,7 +32,7 @@ char cmdBuffer[CMD_BUFFER_SIZE];
 int cmdIndex = 0;
 bool inCommand = false;
 
-// Command queuing system (v0.1.5-beta optimization)
+// Command queuing system (v0.1.6-beta modular architecture)
 struct QueuedCommand {
   char command[CMD_BUFFER_SIZE];
   bool valid;
@@ -36,20 +42,15 @@ int queueHead = 0;
 int queueTail = 0;
 int queueCount = 0;
 
-// Response buffer for efficient serial output (v0.1.5-beta optimization)
+// Response buffer for efficient serial output (v0.1.6-beta modular architecture)
 char responseBuffer[RESPONSE_BUFFER_SIZE];
 int responseIndex = 0;
 
-// PWM management
-struct PWMChannel {
-  int pin;
-  int channel;
-  bool active;
-};
+// PWM management (structure now in pwm.h)
 PWMChannel pwmChannels[MAX_PWM_CHANNELS];
 int nextPWMChannel = 0;
 
-// O(1) PWM channel lookup optimization (v0.1.5-beta)
+// O(1) PWM channel lookup optimization (v0.1.6-beta)
 int8_t pinToPWMChannel[MAX_PINS];  // -1 = unused
 
 // FreeRTOS task handles
@@ -57,7 +58,7 @@ TaskHandle_t serialTaskHandle;
 TaskHandle_t failsafeTaskHandle;
 SemaphoreHandle_t sharedDataMutex;
 
-// Queue management functions (v0.1.5-beta)
+// Queue management functions (v0.1.6-beta)
 bool enqueueCommand(const char* cmd) {
   if (queueCount >= CMD_QUEUE_SIZE) return false;  // Queue full
   
@@ -113,12 +114,12 @@ void setup() {
     pwmChannels[i].active = false;
   }
   
-  // Initialize PWM channel lookup mapping (v0.1.5-beta optimization)
+  // Initialize PWM channel lookup mapping (v0.1.6-beta optimization)
   for (int i = 0; i < MAX_PINS; i++) {
     pinToPWMChannel[i] = -1;  // -1 = unused
   }
   
-  // Initialize command queue (v0.1.5-beta optimization)
+  // Initialize command queue (v0.1.6-beta optimization)
   for (int i = 0; i < CMD_QUEUE_SIZE; i++) {
     cmdQueue[i].valid = false;
     cmdQueue[i].command[0] = '\0';
@@ -127,7 +128,7 @@ void setup() {
   queueTail = 0;
   queueCount = 0;
   
-  // Initialize response buffer (v0.1.5-beta optimization)
+  // Initialize response buffer (v0.1.6-beta optimization)
   clearResponse();
   
   // Wait for serial to stabilize and flush any boot garbage
@@ -147,14 +148,14 @@ void setup() {
   lastCommandTime = millis();
   lastPingTime = millis();
   
-  // Create mutex for shared data protection (v0.1.5-beta)
+  // Create mutex for shared data protection (v0.1.6-beta)
   sharedDataMutex = xSemaphoreCreateMutex();
   if (sharedDataMutex == NULL) {
     Serial.println("<ERROR:Failed to create mutex>");
     return;
   }
   
-  // Create FreeRTOS tasks (v0.1.5-beta)
+  // Create FreeRTOS tasks (v0.1.6-beta)
   xTaskCreatePinnedToCore(
     serialTask,           // Task function
     "SerialTask",         // Task name
@@ -178,7 +179,7 @@ void setup() {
   Serial.println("<INFO:FreeRTOS tasks initialized - Dual-core operation enabled>");
 }
 
-// FreeRTOS Tasks (v0.1.5-beta)
+// FreeRTOS Tasks (v0.1.6-beta)
 void serialTask(void* parameter) {
   while (true) {
     // Phase 1: Parse and queue incoming commands
@@ -238,7 +239,7 @@ void serialTask(void* parameter) {
   }
 }
 
-// Helper function to update command timestamps (v0.1.5-beta)
+// Helper function to update command timestamps (v0.1.6-beta)
 void updateCommandTimestamps() {
   lastCommandTime = millis();
   lastPingTime = millis();
@@ -267,7 +268,7 @@ void failsafeTask(void* parameter) {
 
 void loop() {
   // Main loop is now minimal - just wait for tasks to complete
-  // All actual work is done by FreeRTOS tasks (v0.1.5-beta)
+  // All actual work is done by FreeRTOS tasks (v0.1.6-beta)
   vTaskDelay(portMAX_DELAY);
 }
 
@@ -431,484 +432,8 @@ void processCommand(char* cmd) {
     else { Serial.println("<ERROR:Unknown or incomplete command>"); }
 }
 
-bool isValidPin(int pin) { return (pin >= 0 && pin < MAX_PINS); }
 
-void trackPin(int pin) {
-    if(isValidPin(pin)) configuredPins[pin] = true;
-}
 
-void handlePinMode(const char* pinStr, const char* modeStr) {
-    int pin = atoi(pinStr);
-    if (!isValidPin(pin)) { Serial.println("<ERROR:Invalid pin>"); return; }
-    trackPin(pin);
-    
-    // Convert mode to uppercase for comparison
-    char mode[15];
-    strncpy(mode, modeStr, 14);
-    mode[14] = '\0';
-    for (char* p = mode; *p; p++) *p = toupper(*p);
-    
-    if (strcmp(mode, "OUT") == 0) { 
-        pinMode(pin, OUTPUT);
-        outputCommandsSent = true;  // Output mode - enable failsafe
-    }
-    else if (strcmp(mode, "IN") == 0) { pinMode(pin, INPUT); }
-    else if (strcmp(mode, "IN_PULLUP") == 0) { 
-        pinMode(pin, INPUT_PULLUP);
-        outputCommandsSent = true;  // Pullup can source current - enable failsafe
-    }
-    else if (strcmp(mode, "IN_PULLDOWN") == 0) { 
-        pinMode(pin, INPUT_PULLDOWN);
-    }
-    else { Serial.println("<ERROR:Invalid mode>"); return; }
-    // OK response removed (v0.1.4 optimization - no response for write commands)
-}
 
-void handleDigitalWrite(String pinStr, String valStr) {
-    int pin = pinStr.toInt();
-    if (!isValidPin(pin)) { Serial.println("<ERROR:Invalid pin>"); return; }
-    digitalWrite(pin, valStr.toInt() == 1 ? HIGH : LOW);
-    outputCommandsSent = true;  // Writing to pin - enable failsafe
-    // OK response removed (v0.1.4 optimization)
-}
 
-void handleDigitalRead(String pinStr) {
-    int pin = pinStr.toInt();
-    if (!isValidPin(pin)) { 
-        clearResponse();
-        addToResponse("<ERROR:Invalid pin>");
-        sendResponse();
-        return; 
-    }
-    clearResponse();
-    addToResponse("<");
-    addToResponse(digitalRead(pin));
-    addToResponse(">");
-    sendResponse();
-}
 
-void initADC() {
-    if (!adcInitialized) {
-        adc1_config_width(ADC_WIDTH_BIT_12);
-        adc_chars = (esp_adc_cal_characteristics_t *)calloc(1, sizeof(esp_adc_cal_characteristics_t));
-        esp_adc_cal_characterize(ADC_UNIT_1, ADC_ATTEN_DB_11, ADC_WIDTH_BIT_12, DEFAULT_VREF, adc_chars);
-        adcInitialized = true;
-    }
-}
-
-adc1_channel_t getADC1Channel(int pin) {
-    switch(pin) {
-        case 36: return ADC1_CHANNEL_0;
-        case 37: return ADC1_CHANNEL_1;
-        case 38: return ADC1_CHANNEL_2;
-        case 39: return ADC1_CHANNEL_3;
-        case 32: return ADC1_CHANNEL_4;
-        case 33: return ADC1_CHANNEL_5;
-        case 34: return ADC1_CHANNEL_6;
-        case 35: return ADC1_CHANNEL_7;
-        default: return ADC1_CHANNEL_MAX;
-    }
-}
-
-void handleAnalogRead(String pinStr) {
-    int pin = pinStr.toInt();
-    if (!isValidPin(pin)) { 
-        clearResponse();
-        addToResponse("<ERROR:Invalid pin>");
-        sendResponse();
-        return; 
-    }
-    
-    adc1_channel_t channel = getADC1Channel(pin);
-    if (channel == ADC1_CHANNEL_MAX) {
-        clearResponse();
-        addToResponse("<ERROR:Pin is not a valid ADC pin>");
-        sendResponse();
-        return;
-    }
-    
-    initADC();
-    adc1_config_channel_atten(channel, ADC_ATTEN_DB_11);
-    
-    int raw = adc1_get_raw(channel);
-    clearResponse();
-    addToResponse("<");
-    addToResponse(raw);
-    addToResponse(">");
-    sendResponse();
-}
-
-void handleAnalogWrite(String pinStr, String valStr) {
-  int pin = pinStr.toInt();
-  int value = valStr.toInt();
-  if (pin != 25 && pin != 26) {
-    Serial.println("<ERROR:Pin is not a valid DAC pin (use 25 or 26)>");
-    return;
-  }
-  if (value < 0 || value > 255) {
-    Serial.println("<ERROR:Value must be between 0 and 255>");
-    return;
-  }
-  dacWrite(pin, value);
-  outputCommandsSent = true;  // DAC output - enable failsafe
-  // OK response removed (v0.1.4 optimization)
-}
-
-void handleI2CInit(String sdaStr, String sclStr) {
-    Wire.begin(sdaStr.toInt(), sclStr.toInt());
-    // OK response removed (v0.1.4 optimization)
-}
-
-void handleI2CScan() {
-    clearResponse();
-    addToResponse("<");
-    
-    bool first = true;
-    for (byte address = 1; address < 127; address++) {
-        Wire.beginTransmission(address);
-        if (Wire.endTransmission() == 0) {
-            if (!first) addToResponse(" ");
-            addToResponse("0x");
-            char hexStr[4];
-            sprintf(hexStr, "%02X", address);
-            addToResponse(hexStr);
-            first = false;
-        }
-    }
-    addToResponse(">");
-    sendResponse();
-}
-
-void handleI2CWrite(String addrStr, String parts[], int partCount) {
-    byte addr = strtol(addrStr.c_str(), NULL, 16);
-    Wire.beginTransmission(addr);
-    for (int i = 2; i < partCount; i++) {
-        Wire.write((byte)strtol(parts[i].c_str(), NULL, 16));
-    }
-    if (Wire.endTransmission() == 0) {
-        // OK response removed (v0.1.4 optimization)
-    } else {
-        Serial.println("<ERROR:I2C write failed>");
-    }
-}
-
-void handleI2CRead(String addrStr, String lenStr) {
-    byte addr = strtol(addrStr.c_str(), NULL, 16);
-    int len = lenStr.toInt();
-    Wire.requestFrom(addr, (byte)len);
-    
-    clearResponse();
-    addToResponse("<");
-    
-    bool first = true;
-    while (Wire.available()) {
-        if (!first) addToResponse(" ");
-        char hexStr[4];
-        sprintf(hexStr, "%02X", Wire.read());
-        addToResponse(hexStr);
-        first = false;
-    }
-    addToResponse(">");
-    sendResponse();
-}
-
-void handleI2SInitTx(String bckStr, String wsStr, String dataStr, String rateStr) {
-    i2s_config_t i2s_config = {
-        .mode = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_TX),
-        .sample_rate = (uint32_t)rateStr.toInt(),
-        .bits_per_sample = I2S_BITS_PER_SAMPLE_16BIT,
-        .channel_format = I2S_CHANNEL_FMT_RIGHT_LEFT,
-        .communication_format = I2S_COMM_FORMAT_STAND_I2S,
-        .intr_alloc_flags = 0,
-        .dma_buf_count = 8,
-        .dma_buf_len = 64,
-        .use_apll = false
-    };
-    i2s_pin_config_t pin_config = {
-        .bck_io_num = (gpio_num_t)bckStr.toInt(),
-        .ws_io_num = (gpio_num_t)wsStr.toInt(),
-        .data_out_num = (gpio_num_t)dataStr.toInt(),
-        .data_in_num = I2S_PIN_NO_CHANGE
-    };
-    i2s_driver_install(I2S_NUM_0, &i2s_config, 0, NULL);
-    i2s_set_pin(I2S_NUM_0, &pin_config);
-    // OK response removed (v0.1.4 optimization)
-}
-
-void handleI2SWrite(String parts[], int partCount) {
-    size_t bytes_written = 0;
-    int16_t* buffer = new int16_t[partCount - 1];
-    for(int i=1; i < partCount; i++) {
-        buffer[i-1] = (int16_t)parts[i].toInt();
-    }
-    i2s_write(I2S_NUM_0, buffer, (partCount-1) * sizeof(int16_t), &bytes_written, portMAX_DELAY);
-    delete[] buffer;
-    // OK response removed (v0.1.4 optimization)
-}
-
-// PWM Functions
-// O(1) PWM channel lookup optimization (v0.1.5-beta)
-int findPWMChannel(int pin) {
-    if (pin < 0 || pin >= MAX_PINS) return -1;
-    return pinToPWMChannel[pin];
-}
-
-int allocatePWMChannel(int pin) {
-    // Check if pin already has a channel
-    int existingChannel = findPWMChannel(pin);
-    if (existingChannel != -1) {
-        return existingChannel;
-    }
-    
-    // Find free channel
-    for (int i = 0; i < MAX_PWM_CHANNELS; i++) {
-        if (!pwmChannels[i].active) {
-            pwmChannels[i].pin = pin;
-            pwmChannels[i].active = true;
-            pinToPWMChannel[pin] = i;  // Update O(1) mapping (v0.1.5-beta)
-            return i;
-        }
-    }
-    return -1;
-}
-
-void handlePWMInit(String pinStr, String freqStr, String resStr) {
-    int pin = pinStr.toInt();
-    int frequency = freqStr.toInt();
-    int resolution = resStr.toInt();
-    
-    if (!isValidPin(pin)) {
-        Serial.println("<ERROR:Invalid pin>");
-        return;
-    }
-    
-    if (frequency < 1 || frequency > 40000) {
-        Serial.println("<ERROR:Frequency must be between 1 and 40000 Hz>");
-        return;
-    }
-    
-    if (resolution < 1 || resolution > 16) {
-        Serial.println("<ERROR:Resolution must be between 1 and 16 bits>");
-        return;
-    }
-    
-    int channel = allocatePWMChannel(pin);
-    if (channel == -1) {
-        Serial.println("<ERROR:No PWM channels available>");
-        return;
-    }
-    
-    // Use new ESP32 Arduino core 3.x API
-    #if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
-        if (!ledcAttach(pin, frequency, resolution)) {
-            Serial.println("<ERROR:PWM attach failed>");
-            pwmChannels[channel].active = false;
-            pwmChannels[channel].pin = -1;
-            return;
-        }
-    #else
-        // Use old API for compatibility with ESP32 Arduino core 2.x
-        ledcSetup(channel, frequency, resolution);
-        ledcAttachPin(pin, channel);
-    #endif
-    
-    trackPin(pin);
-    outputCommandsSent = true;  // PWM output - enable failsafe
-    
-    clearResponse();
-    addToResponse("<");
-    addToResponse(channel);
-    addToResponse(">");
-    sendResponse();
-}
-
-void handlePWMWrite(String pinStr, String dutyStr) {
-    int pin = pinStr.toInt();
-    int duty = dutyStr.toInt();
-    
-    if (!isValidPin(pin)) {
-        Serial.println("<ERROR:Invalid pin>");
-        return;
-    }
-    
-    int channel = findPWMChannel(pin);
-    if (channel == -1) {
-        Serial.println("<ERROR:PWM not initialized for this pin>");
-        return;
-    }
-    
-    // Both old and new API use ledcWrite, but with different parameters
-    #if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
-        ledcWrite(pin, duty);  // New API uses pin
-    #else
-        ledcWrite(channel, duty);  // Old API uses channel
-    #endif
-    
-    outputCommandsSent = true;  // PWM write - enable failsafe
-    // OK response removed (v0.1.4 optimization)
-}
-
-void handlePWMStop(String pinStr) {
-    int pin = pinStr.toInt();
-    
-    if (!isValidPin(pin)) {
-        Serial.println("<ERROR:Invalid pin>");
-        return;
-    }
-    
-    int channel = findPWMChannel(pin);
-    if (channel == -1) {
-        Serial.println("<ERROR:PWM not initialized for this pin>");
-        return;
-    }
-    
-    // Use new or old API depending on version
-    #if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
-        ledcDetach(pin);  // New API
-    #else
-        ledcDetachPin(pin);  // Old API
-    #endif
-    
-    pwmChannels[channel].active = false;
-    pwmChannels[channel].pin = -1;
-    pinToPWMChannel[pin] = -1;  // Clear O(1) mapping (v0.1.5-beta)
-    // OK response removed (v0.1.4 optimization)
-}
-
-// EEPROM Functions
-void handleEEPROMRead(String addrStr) {
-    int addr = addrStr.toInt();
-    
-    if (addr < 0 || addr >= EEPROM_SIZE) {
-        clearResponse();
-        addToResponse("<ERROR:Address out of range>");
-        sendResponse();
-        return;
-    }
-    
-    byte value = EEPROM.read(addr);
-    clearResponse();
-    addToResponse("<");
-    addToResponse((int)value);
-    addToResponse(">");
-    sendResponse();
-}
-
-void handleEEPROMWrite(String addrStr, String valStr) {
-    int addr = addrStr.toInt();
-    int value = valStr.toInt();
-    
-    if (addr < 0 || addr >= EEPROM_SIZE) {
-        Serial.println("<ERROR:Address out of range>");
-        return;
-    }
-    
-    if (value < 0 || value > 255) {
-        Serial.println("<ERROR:Value must be between 0 and 255>");
-        return;
-    }
-    
-    EEPROM.write(addr, (byte)value);
-    // OK response removed (v0.1.4 optimization)
-}
-
-void handleEEPROMReadBlock(String addrStr, String lenStr) {
-    int addr = addrStr.toInt();
-    int len = lenStr.toInt();
-    
-    if (addr < 0 || addr >= EEPROM_SIZE) {
-        Serial.println("<ERROR:Start address out of range>");
-        return;
-    }
-    
-    if (len < 1 || (addr + len) > EEPROM_SIZE) {
-        Serial.println("<ERROR:Length invalid or exceeds EEPROM size>");
-        return;
-    }
-    
-    String data = "";
-    for (int i = 0; i < len; i++) {
-        if (i > 0) data += " ";
-        data += String(EEPROM.read(addr + i));
-    }
-    
-    Serial.print("<");
-    Serial.print(data);
-    Serial.println(">");
-}
-
-void handleEEPROMWriteBlock(String parts[], int partCount) {
-    if (partCount < 3) {
-        Serial.println("<ERROR:Invalid parameters>");
-        return;
-    }
-    
-    int addr = parts[1].toInt();
-    
-    if (addr < 0 || addr >= EEPROM_SIZE) {
-        Serial.println("<ERROR:Address out of range>");
-        return;
-    }
-    
-    int dataCount = partCount - 2;
-    if ((addr + dataCount) > EEPROM_SIZE) {
-        Serial.println("<ERROR:Data exceeds EEPROM size>");
-        return;
-    }
-    
-    for (int i = 0; i < dataCount; i++) {
-        int value = parts[i + 2].toInt();
-        if (value < 0 || value > 255) {
-            Serial.println("<ERROR:Value must be between 0 and 255>");
-            return;
-        }
-        EEPROM.write(addr + i, (byte)value);
-    }
-    
-    // OK response removed (v0.1.4 optimization)
-}
-
-void handleEEPROMCommit() {
-    if (EEPROM.commit()) {
-        // OK response removed (v0.1.4 optimization)
-    } else {
-        Serial.println("<ERROR:EEPROM commit failed>");
-    }
-}
-
-void handleEEPROMClear() {
-    for (int i = 0; i < EEPROM_SIZE; i++) {
-        EEPROM.write(i, 0);
-    }
-    if (EEPROM.commit()) {
-        // OK response removed (v0.1.4 optimization)
-    } else {
-        Serial.println("<ERROR:EEPROM clear failed>");
-    }
-}
-
-// Batch Operations
-void handleBatchWrite(String parts[], int partCount) {
-    if (partCount < 3 || (partCount - 1) % 2 != 0) {
-        Serial.println("<ERROR:Invalid batch format. Use: BATCH_WRITE pin1 val1 pin2 val2 ...>");
-        return;
-    }
-    
-    int numPairs = (partCount - 1) / 2;
-    for (int i = 0; i < numPairs; i++) {
-        int pin = parts[1 + i * 2].toInt();
-        int value = parts[2 + i * 2].toInt();
-        
-        if (!isValidPin(pin)) {
-            Serial.print("<ERROR:Invalid pin ");
-            Serial.print(pin);
-            Serial.println(">");
-            return;
-        }
-        
-        digitalWrite(pin, value == 1 ? HIGH : LOW);
-    }
-    
-    outputCommandsSent = true;  // Batch write - enable failsafe
-    // OK response removed (v0.1.4 optimization)
-}

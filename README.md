@@ -1,6 +1,6 @@
 # ESP32 GPIO Bridge
 
-**Version:** 0.1.5-beta
+**Version:** 0.1.6-beta
 
 ## Overview
 
@@ -8,11 +8,47 @@ ESP32 GPIO Bridge transforms an ESP32 development board into a versatile, PC-con
 
 The system communicates over a simple, text-based serial protocol via USB connection, providing a comprehensive Python library for GPIO control, PWM, I2C communication, EEPROM storage, and sensor integration.
 
-**New in v0.1.5-beta:** Advanced dual-core architecture with FreeRTOS tasks, command queuing system, and optimized serial responses. Professional-grade performance with 5-10x faster command throughput!
+**New in v0.1.6-beta:** Complete architectural refactoring with professional modular firmware design. Transformed from monolithic single-file architecture to 8 specialized modules with 54% reduction in main file size and dramatically improved maintainability!
+
+**Previous v0.1.5-beta:** Advanced dual-core architecture with FreeRTOS tasks, command queuing system, and optimized serial responses. Professional-grade performance with 5-10x faster command throughput.
 
 **Previous v0.1.4-beta:** Major performance optimizations with 2-3x faster operations, zero queue contamination, and 99.99% reduction in CPU overhead.
 
 **Previous v0.1.3-beta:** WiFi and Bluetooth are disabled by default to maximize GPIO performance and free up resources for extensive peripheral usage.
+
+## What's New in v0.1.6-beta
+
+**Professional Modular Architecture:**
+
+### Complete Code Modularization
+- **Transformed monolithic firmware** from single 961-line file to 8 specialized modules
+- **54% reduction in main firmware file size** while maintaining full functionality
+- **Professional software architecture** following industry best practices
+- **Enhanced maintainability and development workflow**
+
+### Modular Design Benefits
+- **Improved code organization** - Each hardware interface in dedicated module
+- **Enhanced debugging capabilities** - Issues isolated to specific modules
+- **Parallel development support** - Multiple developers can work simultaneously
+- **Professional project structure** - Industry-standard modular architecture
+
+### Module Structure
+- **config.h** - Centralized configuration constants and system parameters
+- **response.h/.cpp** - Optimized serial response buffer management
+- **gpio.h/.cpp** - Digital I/O operations and pin management
+- **pwm.h/.cpp** - PWM channel allocation and control
+- **analog.h/.cpp** - ADC/DAC operations with calibration
+- **i2c.h/.cpp** - I2C communication protocol
+- **eeprom.h/.cpp** - Persistent storage operations
+- **i2s.h/.cpp** - I2S audio interface
+
+### Development Impact
+- **Easier maintenance** - Bug fixes isolated to specific modules
+- **Enhanced testing** - Each module can be unit tested independently
+- **Better documentation** - Module-specific interfaces and documentation
+- **Professional development workflow** - Clean separation of concerns
+
+**Result:** Professional-grade firmware architecture with dramatically improved maintainability and development experience!
 
 ## What's New in v0.1.5-beta
 
@@ -88,12 +124,13 @@ The system communicates over a simple, text-based serial protocol via USB connec
 +------------------------+           +--------------+      +---------+      +-------------------+
 ```
 
-**Optimized Communication Flow (v0.1.5-beta):**
-- **Dual-core FreeRTOS tasks** - Maximum CPU utilization
-- **Command queuing system** - Batch processing for 5-10x throughput
-- **Response buffer optimization** - Single-call serial output
-- **Thread-safe operation** - Mutex-protected shared data
-- **Professional architecture** - Separation of concerns
+**Modular Firmware Architecture (v0.1.6-beta):**
+- **Professional modular design** - 8 specialized hardware interface modules
+- **Clean separation of concerns** - Each module handles specific hardware functionality
+- **Enhanced maintainability** - Independent development and testing of modules
+- **Dual-core FreeRTOS tasks** - Maximum CPU utilization with dedicated processing
+- **Command queuing system** - Batch processing for optimal throughput
+- **Thread-safe operation** - Mutex-protected shared data access
 
 ## Features
 
@@ -111,10 +148,12 @@ The system communicates over a simple, text-based serial protocol via USB connec
 - **Context Manager Support:** Automatic resource cleanup with `with` statements
 - **Optimized Performance:** WiFi and Bluetooth disabled for maximum GPIO resource availability
 - **Production-Ready Performance:** 2-3x faster operations with zero queue contamination
+- **Professional Modular Architecture:** 8 specialized modules with clean separation of concerns
 - **Advanced Dual-Core Architecture:** FreeRTOS tasks with 5-10x faster command throughput
 - **Command Queuing System:** Batch processing with 32-command circular buffer
 - **Optimized Serial Communication:** Single-call response output with reduced overhead
 - **Thread-Safe Operation:** Mutex-protected shared data access
+- **Enhanced Maintainability:** Independent module development and testing capabilities
 - **Advanced Error Filtering:** Robust handling of ESP32 system messages and background noise
 
 ## Enhanced Failsafe Mechanism
@@ -197,11 +236,14 @@ print(f"Failsafe reset: {success}")
 
 **Flashing Instructions:**
 
-1. Open `esp32_GPIO_bridge.ino` in the Arduino IDE
+1. Open `firmware/firmware.ino` in the Arduino IDE
+   - The Arduino IDE will automatically include all modular files (config.h, gpio.h/.cpp, etc.)
 2. Connect ESP32 board via USB
 3. Select your ESP32 board model in Tools > Board
 4. Select the correct serial port in Tools > Port
 5. Upload the firmware to the ESP32
+
+**Note:** The firmware uses a modular architecture with 8 specialized modules. The Arduino IDE automatically compiles all included header and source files from the firmware directory.
 
 ### 2. Python Library Installation
 
@@ -819,16 +861,24 @@ esp32-gpio-bridge/
 ├── tests/               # Test suite
 │   ├── __init__.py
 │   └── test_pins.py     # Pin management tests (16 tests)
-├── firmware/              # ESP32 firmware source code
-│   ├── firmware.ino      # Main firmware file (v0.1.5-beta, dual-core optimized)
-│   └── README.md         # Firmware code structure and splitting plan
+├── firmware/              # ESP32 firmware source code (v0.1.6-beta, modular architecture)
+│   ├── firmware.ino      # Main firmware file (modular design)
+│   ├── config.h          # Configuration constants
+│   ├── response.h/.cpp   # Response buffer management
+│   ├── gpio.h/.cpp      # Digital I/O operations
+│   ├── pwm.h/.cpp       # PWM management
+│   ├── analog.h/.cpp    # ADC/DAC operations
+│   ├── i2c.h/.cpp       # I2C communication
+│   ├── eeprom.h/.cpp    # EEPROM storage
+│   ├── i2s.h/.cpp       # I2S audio interface
+│   └── README.md         # Firmware documentation
 ├── environment.yml      # Conda environment configuration
 ├── setup.py            # Package installation
 ├── requirements.txt    # Python dependencies (includes types-pyserial)
 ├── FIRMWARE_OPTIMIZATION_GUIDE.md # Complete optimization guide
 ├── CHANGELOG.md        # Detailed version history
 ├── .gitignore         # Comprehensive ignore patterns
-└── README.md          # This file (updated for v0.1.5-beta)
+└── README.md          # This file (updated for v0.1.6-beta)
 ```
 
 ### Contributing

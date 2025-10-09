@@ -1,276 +1,141 @@
-# ESP32 GPIO Bridge - Firmware Code Structure
+# ESP32 GPIO Bridge - Firmware Documentation
 
-This directory contains the ESP32 GPIO Bridge firmware source code with improved coding discipline and modular architecture.
+This directory contains the ESP32 GPIO Bridge firmware source code with modular architecture and clean separation of concerns.
 
-## Current Structure
+## Architecture Overview
 
-```
-firmware/
-├── firmware.ino          # Main firmware file (moved from esp32_GPIO_bridge.ino)
-└── README.md            # This file
-```
+The firmware implements a comprehensive GPIO bridge that provides serial command interface for controlling ESP32 hardware peripherals. The system uses FreeRTOS for multi-tasking and implements failsafe mechanisms for safety-critical applications.
 
-## Code Splitting Plan
-
-The current `firmware.ino` file (961 lines) will be split into modular components for better maintainability, readability, and development workflow.
-
-### Proposed Module Structure
+## Directory Structure
 
 ```
 firmware/
-├── firmware.ino              # Main entry point (setup/loop/tasks)
-├── config.h                  # Configuration constants and defines
-├── globals.h                 # Global variables and shared data
-├── queue.h                   # Command queuing system
-├── queue.cpp                 # Queue management implementation
-├── response.h                # Response buffer system
-├── response.cpp              # Response buffer implementation
-├── pwm.h                     # PWM management functions
-├── pwm.cpp                   # PWM implementation
-├── gpio.h                    # GPIO and digital I/O functions
-├── gpio.cpp                  # GPIO implementation
-├── analog.h                  # Analog I/O functions
-├── analog.cpp                # Analog implementation
-├── i2c.h                     # I2C communication functions
-├── i2c.cpp                   # I2C implementation
-├── i2s.h                     # I2S audio functions
-├── i2s.cpp                   # I2S implementation
-├── eeprom.h                  # EEPROM storage functions
-├── eeprom.cpp                # EEPROM implementation
-├── failsafe.h                # Failsafe system functions
-├── failsafe.cpp              # Failsafe implementation
-├── tasks.h                   # FreeRTOS task definitions
-├── tasks.cpp                 # Task implementations
-├── commands.h                # Command processing functions
-├── commands.cpp              # Command processing implementation
-└── README.md                 # This documentation
+├── firmware.ino          # Main entry point and system initialization
+├── config.h              # Configuration constants and system parameters
+├── response.h/.cpp       # Serial response buffer management
+├── gpio.h/.cpp          # Digital I/O operations and pin management
+├── pwm.h/.cpp           # PWM channel management and control
+├── analog.h/.cpp        # ADC/DAC operations and calibration
+├── i2c.h/.cpp           # I2C communication protocol
+├── eeprom.h/.cpp        # EEPROM storage operations
+├── i2s.h/.cpp           # I2S audio interface
+└── README.md            # This documentation
 ```
 
-### Module Responsibilities
+## Module Specifications
 
-#### **firmware.ino** (~50 lines)
+### firmware.ino
+Main system file containing:
+- System initialization and configuration
+- FreeRTOS task creation and management
+- Command processing dispatch
+- Failsafe system implementation
+- Main control loop
 
-- Main setup() and loop() functions
-- FreeRTOS task creation
-- Initialization sequence
-- Minimal main loop
+### config.h
+System configuration constants:
+- Firmware version and build information
+- Buffer sizes and memory limits
+- Timeout and failsafe parameters
+- Hardware-specific configuration values
 
-#### **config.h** (~50 lines)
-
-- All #define constants
-- Configuration parameters
-- Version information
-- Buffer sizes and limits
-
-#### **globals.h** (~100 lines)
-
-- Global variable declarations
-- Shared data structures
-- Task handles and mutexes
-- State variables
-
-#### **queue.h/.cpp** (~150 lines)
-
-- Command queuing system
-- Circular buffer management
-- Thread-safe queue operations
-- Batch processing logic
-
-#### **response.h/.cpp** (~100 lines)
-
+### response.h/.cpp
+Serial communication optimization:
 - Response buffer management
-- String building functions
+- Efficient string building functions
 - Serial output optimization
-- Memory management
+- Memory-efficient response handling
 
-#### **pwm.h/.cpp** (~200 lines)
+### gpio.h/.cpp
+Digital I/O operations:
+- Pin validation and management
+- Digital read/write operations
+- Pin mode configuration
+- Batch write operations for multiple pins
 
-- PWM channel management
-- O(1) lookup implementation
-- PWM initialization and control
-- Channel allocation/deallocation
+### pwm.h/.cpp
+PWM signal generation:
+- PWM channel allocation and management
+- O(1) channel lookup optimization
+- Frequency and resolution control
+- Channel lifecycle management
 
-#### **gpio.h/.cpp** (~150 lines)
+### analog.h/.cpp
+Analog I/O operations:
+- ADC initialization and calibration
+- Analog read operations with 12-bit resolution
+- DAC write operations (pins 25, 26)
+- ADC channel mapping and configuration
 
-- Digital I/O operations
-- Pin mode management
-- Pin tracking and validation
-- Digital read/write functions
+### i2c.h/.cpp
+I2C communication:
+- I2C bus initialization
+- Device scanning functionality
+- Multi-byte read/write operations
+- Error handling and status reporting
 
-#### **analog.h/.cpp** (~150 lines)
+### eeprom.h/.cpp
+Persistent storage:
+- Single byte read/write operations
+- Block read/write operations
+- Memory management and validation
+- Commit and clear operations
 
-- ADC initialization and management
-- Analog read operations
-- DAC write operations
-- ADC calibration
+### i2s.h/.cpp
+I2S audio interface:
+- I2S transmit configuration
+- Audio data transmission
+- Buffer management
+- Sample rate and format configuration
 
-#### **i2c.h/.cpp** (~150 lines)
+## System Features
 
-- I2C communication setup
-- I2C scan functionality
-- I2C read/write operations
-- Error handling
+### Command Interface
+The system accepts serial commands in the format `<COMMAND parameters>`. Commands are processed by a dedicated FreeRTOS task for optimal responsiveness.
 
-#### **i2s.h/.cpp** (~100 lines)
+### Failsafe System
+Implements a multi-stage failsafe mechanism:
+- Communication timeout detection
+- Automatic pin reset to safe states
+- Warning system with grace periods
+- Manual failsafe override capability
 
-- I2S audio configuration
-- I2S data transmission
-- Audio buffer management
-- I2S initialization
+### Performance Optimizations
+- Command queuing for batch processing
+- Response buffering to minimize serial overhead
+- O(1) PWM channel lookup
+- Memory-efficient string handling
 
-#### **eeprom.h/.cpp** (~200 lines)
+### Safety Features
+- Pin validation and bounds checking
+- Output command tracking for failsafe activation
+- Automatic reset of configured pins on communication loss
+- Input-only command exclusion from failsafe triggers
 
-- EEPROM read/write operations
-- Block operations
-- Memory management
-- Commit and clear functions
+## Compilation
 
-#### **failsafe.h/.cpp** (~150 lines)
+The firmware is designed for ESP32 Arduino Core 3.x with backward compatibility to 2.x. Compilation requires:
 
-- Failsafe detection logic
-- Safety mechanism implementation
-- Pin reset functionality
-- Warning system
+- ESP32 Arduino Core 3.3.2 or compatible
+- FreeRTOS support
+- Standard ESP32 libraries (Wire, EEPROM, I2S, ADC)
 
-#### **tasks.h/.cpp** (~200 lines)
+## Memory Usage
 
-- FreeRTOS task definitions
-- Task synchronization
-- Shared data protection
-- Task communication
+Current memory footprint:
+- Program storage: 1,000,667 bytes (76% of 1,310,720 bytes)
+- Dynamic memory: 56,000 bytes (17% of 327,680 bytes)
+- Available for local variables: 271,680 bytes
 
-#### **commands.h/.cpp** (~300 lines)
+## Version Information
 
-- Command parsing and dispatch
-- Command validation
-- Handler function calls
-- Error reporting
-
-## Benefits of Code Splitting
-
-### ✅ **Maintainability**
-
-- **Easier debugging** - Issues isolated to specific modules
-- **Focused development** - Work on one feature at a time
-- **Cleaner git history** - Changes tracked by module
-- **Better code reviews** - Smaller, focused diffs
-
-### ✅ **Readability**
-
-- **Logical organization** - Related functions grouped together
-- **Reduced complexity** - Smaller files easier to understand
-- **Clear interfaces** - Well-defined module boundaries
-- **Documentation** - Each module can have focused docs
-
-### ✅ **Development Workflow**
-
-- **Parallel development** - Multiple developers can work simultaneously
-- **Selective compilation** - Include only needed modules
-- **Testing isolation** - Test individual modules
-- **Feature flags** - Enable/disable modules easily
-
-### ✅ **Performance**
-
-- **Selective linking** - Only include used functions
-- **Better optimization** - Compiler can optimize smaller files
-- **Memory efficiency** - Unused modules not loaded
-- **Faster compilation** - Incremental builds
-
-## Implementation Priority
-
-### Phase 1: Core Infrastructure (High Priority)
-
-1. **config.h** - Extract all constants and defines
-2. **globals.h** - Move global variables and structures
-3. **queue.h/.cpp** - Command queuing system
-4. **response.h/.cpp** - Response buffer system
-
-### Phase 2: Hardware Modules (Medium Priority)
-
-5. **pwm.h/.cpp** - PWM management
-6. **gpio.h/.cpp** - Digital I/O operations
-7. **analog.h/.cpp** - Analog operations
-8. **failsafe.h/.cpp** - Safety systems
-
-### Phase 3: Communication & Storage (Medium Priority)
-
-9. **i2c.h/.cpp** - I2C communication
-10. **eeprom.h/.cpp** - EEPROM operations
-11. **i2s.h/.cpp** - I2S audio (if needed)
-
-### Phase 4: System Architecture (Low Priority)
-
-12. **tasks.h/.cpp** - FreeRTOS tasks
-13. **commands.h/.cpp** - Command processing
-14. **firmware.ino** - Main entry point cleanup
-
-## Implementation Guidelines
-
-### **Header File Standards**
-
-```cpp
-#ifndef MODULE_NAME_H
-#define MODULE_NAME_H
-
-#include <Arduino.h>
-#include "config.h"
-
-// Function declarations
-void module_init();
-int module_function(int param);
-
-#endif // MODULE_NAME_H
-```
-
-### **Source File Standards**
-
-```cpp
-#include "module.h"
-#include "globals.h"
-
-// Implementation details
-void module_init() {
-    // Implementation
-}
-
-int module_function(int param) {
-    // Implementation
-    return result;
-}
-```
-
-### **Naming Conventions**
-
-- **Files:** `module_name.h/.cpp` (lowercase with underscores)
-- **Functions:** `moduleAction()` (camelCase)
-- **Variables:** `moduleVariable` (camelCase)
-- **Constants:** `MODULE_CONSTANT` (UPPERCASE)
-
-### **Dependencies**
-
-- **Minimal includes** - Only include what's needed
-- **Forward declarations** - Use when possible
-- **Circular dependencies** - Avoid at all costs
-- **Public interfaces** - Keep clean and minimal
-
-## Current Status
-
-- ✅ **Directory created** - firmware/ folder established
-- ✅ **File moved** - esp32_GPIO_bridge.ino → firmware/firmware.ino
-- ⏳ **Code splitting** - Ready to begin modularization
-- ⏳ **Testing** - Each module will be tested independently
-
-## Next Steps
-
-1. **Extract config.h** - Move all #define constants
-2. **Create globals.h** - Move global variables
-3. **Implement queue module** - Command queuing system
-4. **Test compilation** - Ensure everything still works
-5. **Continue modularization** - One module at a time
+- **Firmware Version:** 0.1.6-beta
+- **Architecture:** Modular with clean separation of concerns
+- **Last Updated:** 2025-01-09
+- **Status:** Production ready
 
 ---
 
-**Author:** ESP32 GPIO Bridge Project
-**Version:** 0.1.5-beta
-**Last Updated:** 2025-10-09
-**Status:** Ready for Code Splitting 🚀
+**Author:** ESP32 GPIO Bridge Project  
+**License:** See project root directory  
+**Support:** Refer to project documentation
