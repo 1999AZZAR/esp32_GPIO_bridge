@@ -251,7 +251,7 @@ print(f"Failsafe reset: {success}")
 
 - Python 3.6 or higher
 
-**Install from source:**
+**Install from source (recommended):**
 
 ```bash
 git clone https://github.com/1999AZZAR/esp32_GPIO_bridge.git esp32-gpio-bridge
@@ -259,10 +259,10 @@ cd esp32-gpio-bridge
 pip install -e .
 ```
 
-**Or install directly:**
+**Install with development dependencies:**
 
 ```bash
-pip install esp32-gpio-bridge
+pip install -e ".[dev]"
 ```
 
 **Dependencies:**

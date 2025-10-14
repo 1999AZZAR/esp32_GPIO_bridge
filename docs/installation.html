@@ -408,13 +408,13 @@ cd esp32_GPIO_bridge</code></pre>
             <p class="text-xl text-gray-600 mb-12">Install the ESP32 GPIO Bridge Python library to control your ESP32 from Python.</p>
             
             <div class="space-y-8">
-                <!-- Method 1: Install from Source -->
+                <!-- Method 1: Install from Source (Recommended) -->
                 <div class="step-card bg-white p-8 rounded-xl shadow-lg border border-gray-200">
                     <div class="flex items-center mb-6">
                         <div class="bg-blue-100 text-blue-600 rounded-full w-12 h-12 flex items-center justify-center mr-4">
                             <i class="fas fa-code"></i>
                         </div>
-                        <h3 class="text-2xl font-semibold">Method 1: Install from Source</h3>
+                        <h3 class="text-2xl font-semibold">Method 1: Install from Source (Recommended)</h3>
                     </div>
                     
                     <div class="space-y-6">
@@ -428,11 +428,8 @@ cd esp32_GPIO_bridge</code></pre>
 git clone https://github.com/1999AZZAR/esp32_GPIO_bridge.git esp32-gpio-bridge
 cd esp32-gpio-bridge
 
-# Install in development mode
-pip install -e .
-
-# Or install directly
-pip install .</code></pre>
+# Install in development mode (recommended)
+pip install -e .</code></pre>
                             </div>
                         </div>
                         
@@ -442,44 +439,45 @@ pip install .</code></pre>
                                 <li>• Access to latest features and bug fixes</li>
                                 <li>• Can modify source code if needed</li>
                                 <li>• Includes all examples and documentation</li>
+                                <li>• Editable installation for development</li>
                             </ul>
                         </div>
                     </div>
                 </div>
 
-                <!-- Method 2: Install from PyPI -->
+                <!-- Method 2: Install with Development Dependencies -->
                 <div class="step-card bg-white p-8 rounded-xl shadow-lg border border-gray-200">
                     <div class="flex items-center mb-6">
                         <div class="bg-green-100 text-green-600 rounded-full w-12 h-12 flex items-center justify-center mr-4">
-                            <i class="fas fa-download"></i>
+                            <i class="fas fa-tools"></i>
                         </div>
-                        <h3 class="text-2xl font-semibold">Method 2: Install from PyPI</h3>
+                        <h3 class="text-2xl font-semibold">Method 2: Install with Development Dependencies</h3>
                     </div>
                     
                     <div class="space-y-6">
                         <div>
-                            <h4 class="font-semibold mb-4">Simple Installation</h4>
+                            <h4 class="font-semibold mb-4">Development Installation</h4>
                             <div class="code-block text-green-400">
                                 <div class="text-gray-400 text-sm mb-4">
-                                    <i class="fas fa-code mr-2"></i>Install from PyPI
+                                    <i class="fas fa-code mr-2"></i>Install with Dev Dependencies
                                 </div>
-                                <pre class="text-sm leading-relaxed"><code># Install latest stable version
-pip install esp32-gpio-bridge
+                                <pre class="text-sm leading-relaxed"><code># Install with development dependencies
+pip install -e ".[dev]"
 
-# Install with development dependencies
-pip install esp32-gpio-bridge[dev]
-
-# Install with example dependencies
-pip install esp32-gpio-bridge[examples]</code></pre>
+# This includes testing and development tools:
+# - pytest (for running tests)
+# - black (for code formatting)
+# - flake8 (for linting)
+# - mypy (for type checking)</code></pre>
                             </div>
                         </div>
                         
                         <div class="bg-green-50 p-6 rounded-lg">
                             <h4 class="font-semibold text-green-900 mb-2">Advantages</h4>
                             <ul class="text-green-800 space-y-1 text-sm">
-                                <li>• Simple one-command installation</li>
-                                <li>• Automatic dependency management</li>
-                                <li>• Stable, tested releases</li>
+                                <li>• Includes development and testing tools</li>
+                                <li>• Ready for contributing to the project</li>
+                                <li>• Access to latest features and bug fixes</li>
                             </ul>
                         </div>
                     </div>
