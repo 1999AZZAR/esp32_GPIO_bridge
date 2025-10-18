@@ -4,6 +4,7 @@
 // External variables from firmware.ino
 extern bool configuredPins[MAX_PINS];
 extern bool outputCommandsSent;
+extern void trackPinState(int pin, uint8_t mode, uint8_t value);
 
 // ============================================================================
 // ESP32 GPIO Bridge - Digital I/O Operations Implementation
@@ -30,15 +31,21 @@ void handlePinMode(const char* pinStr, const char* modeStr) {
     
     if (strcmp(mode, "OUT") == 0) { 
         pinMode(pin, OUTPUT);
+        trackPinState(pin, OUTPUT, LOW);  // Track pin state for safe mode
         outputCommandsSent = true;  // Output mode - enable failsafe
     }
-    else if (strcmp(mode, "IN") == 0) { pinMode(pin, INPUT); }
+    else if (strcmp(mode, "IN") == 0) { 
+        pinMode(pin, INPUT);
+        trackPinState(pin, INPUT, LOW);  // Track pin state for safe mode
+    }
     else if (strcmp(mode, "IN_PULLUP") == 0) { 
         pinMode(pin, INPUT_PULLUP);
+        trackPinState(pin, INPUT_PULLUP, HIGH);  // Track pin state for safe mode
         outputCommandsSent = true;  // Pullup can source current - enable failsafe
     }
     else if (strcmp(mode, "IN_PULLDOWN") == 0) { 
         pinMode(pin, INPUT_PULLDOWN);
+        trackPinState(pin, INPUT_PULLDOWN, LOW);  // Track pin state for safe mode
     }
     else { Serial.println("<ERROR:Invalid mode>"); return; }
     // OK response removed (v0.1.4 optimization - no response for write commands)
@@ -47,7 +54,9 @@ void handlePinMode(const char* pinStr, const char* modeStr) {
 void handleDigitalWrite(String pinStr, String valStr) {
     int pin = pinStr.toInt();
     if (!isValidPin(pin)) { Serial.println("<ERROR:Invalid pin>"); return; }
-    digitalWrite(pin, valStr.toInt() == 1 ? HIGH : LOW);
+    uint8_t value = valStr.toInt() == 1 ? HIGH : LOW;
+    digitalWrite(pin, value);
+    trackPinState(pin, OUTPUT, value);  // Track pin state for safe mode
     outputCommandsSent = true;  // Writing to pin - enable failsafe
     // OK response removed (v0.1.4 optimization)
 }
@@ -85,7 +94,9 @@ void handleBatchWrite(String parts[], int partCount) {
             return;
         }
         
-        digitalWrite(pin, value == 1 ? HIGH : LOW);
+        uint8_t pinValue = value == 1 ? HIGH : LOW;
+        digitalWrite(pin, pinValue);
+        trackPinState(pin, OUTPUT, pinValue);  // Track pin state for safe mode
     }
     
     outputCommandsSent = true;  // Batch write - enable failsafe

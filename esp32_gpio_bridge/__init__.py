@@ -34,7 +34,7 @@ from .controller import (
 from . import pins
 from . import config
 
-__version__ = "0.1.2-beta"
+__version__ = "0.1.7-beta"
 __author__ = "ESP32 GPIO Bridge Project"
 __all__ = [
     'ESP32GPIO',

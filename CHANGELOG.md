@@ -2,6 +2,49 @@
 
 All notable changes to the ESP32 GPIO Bridge project will be documented in this file.
 
+## [0.1.7-beta] - 2025-01-09
+
+### Dual Safe Mode Implementation
+
+#### Two Distinct Safe Mode Behaviors
+- **RESET Mode (Default)**: Traditional failsafe behavior that resets all pins to INPUT mode when communication is lost
+- **HOLD Mode (New)**: Maintains pin states and continues executing queued commands even when communication is lost
+
+#### Key Features
+- **Configurable Safe Mode**: Switch between RESET and HOLD modes via SAFE_MODE_SET command
+- **Pin State Tracking**: System tracks last pin modes and values for HOLD mode restoration
+- **Command Queue Continuation**: In HOLD mode, queued commands continue executing even during failsafe
+- **Enhanced Status Reporting**: STATUS command shows active safe mode type and queue count
+
+#### Implementation Details
+- **Pin State Tracking Arrays**: `lastPinModes[MAX_PINS]`, `lastPinValues[MAX_PINS]`, `pinStatesTracked[MAX_PINS]`
+- **Safe Mode Configuration**: `currentSafeMode` variable with SAFE_MODE_RESET (0) and SAFE_MODE_HOLD (1) constants
+- **Modified Failsafe Logic**: Different behavior based on current safe mode type
+- **Thread-Safe Operation**: Pin state tracking integrated with existing mutex protection
+
+#### New Commands
+- **SAFE_MODE_SET**: Configure safe mode type (0=RESET, 1=HOLD)
+- **SAFE_MODE_GET**: Get current safe mode with name and numeric value
+- **SAFE_MODE_RESTORE**: Restore pin states from tracking (HOLD mode only)
+- **Enhanced STATUS**: Shows safe mode type and queued command count
+
+#### Use Cases
+- **RESET Mode**: Safety-critical applications where pins must be disabled on communication loss
+- **HOLD Mode**: Robotic applications, continuous operation scenarios, servo control where position must be maintained
+
+#### Backward Compatibility
+- **Default behavior unchanged**: RESET mode maintains existing failsafe behavior
+- **Existing applications unaffected**: All current functionality preserved
+- **Opt-in HOLD mode**: New functionality requires explicit configuration
+
+#### Technical Benefits
+- **Robotic Applications**: Maintain servo positions during communication interruptions
+- **Continuous Operation**: Execute queued commands even when host communication is lost
+- **Safety Flexibility**: Choose between reset (safe) or hold (continuous) behavior
+- **Command Queue Utilization**: Full use of existing 32-command queue system in HOLD mode
+
+---
+
 ## [0.1.6-beta] - 2025-01-09
 
 ### Major Architectural Refactoring - Modular Firmware Design

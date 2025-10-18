@@ -5,7 +5,7 @@ This module provides a comprehensive Python interface for controlling ESP32 GPIO
 analog I/O, I2C communication, I2S audio, PWM, and EEPROM from a host computer via USB serial connection.
 
 Author: ESP32 GPIO Bridge Project
-Version: 0.1.4-beta
+Version: 0.1.7-beta
 """
 
 import serial
@@ -53,6 +53,7 @@ class ESP32GPIO:
         self.i2s_initialized = False
         self.pwm_channels: Dict[int, int] = {}  # pin -> channel mapping
         self.eeprom_initialized = False
+        self.failsafe_engaged = False
 
         # Logging setup
         self.logger = logging.getLogger(f"ESP32GPIO.{port}")
@@ -319,27 +320,40 @@ class ESP32GPIO:
 
     def get_status(self) -> Dict[str, Any]:
         """
-        Get ESP32 status including failsafe state.
+        Get ESP32 status including failsafe state and safe mode information.
 
         Returns:
-            Dictionary containing status information
+            Dictionary containing status information including safe mode type and queue count
         """
         try:
             response = self._send_command("STATUS")
             if response and "," in response:
                 parts = response.split(",")
-                if len(parts) >= 3:
+                if len(parts) >= 5:  # New format: state,safe_mode,time_since_command,time_since_ping,queued_commands
                     status_info = {
                         'state': parts[0],
+                        'safe_mode': parts[1],
+                        'time_since_command': int(parts[2]),
+                        'time_since_ping': int(parts[3]),
+                        'queued_commands': int(parts[4]),
+                        'failsafe_engaged': parts[0] == "FAILSAFE"
+                    }
+                    self.failsafe_engaged = bool(status_info['failsafe_engaged'])
+                    return status_info
+                elif len(parts) >= 3:  # Legacy format for older firmware
+                    status_info = {
+                        'state': parts[0],
+                        'safe_mode': 'RESET',  # Default for legacy firmware
                         'time_since_command': int(parts[1]),
                         'time_since_ping': int(parts[2]),
+                        'queued_commands': 0,  # Not available in legacy firmware
                         'failsafe_engaged': parts[0] == "FAILSAFE"
                     }
                     self.failsafe_engaged = bool(status_info['failsafe_engaged'])
                     return status_info
         except (ValueError, IOError):
             pass
-        return {'state': 'UNKNOWN', 'failsafe_engaged': self.failsafe_engaged}
+        return {'state': 'UNKNOWN', 'safe_mode': 'RESET', 'failsafe_engaged': self.failsafe_engaged}
 
     def set_pin_mode(self, pin: int, mode: str) -> None:
         """
@@ -471,6 +485,78 @@ class ESP32GPIO:
             True if failsafe was engaged and reset, False if not engaged
         """
         return self.reset_failsafe()
+
+    # Safe Mode Functions
+    def set_safe_mode(self, mode: int) -> bool:
+        """
+        Set the safe mode behavior for failsafe operation.
+
+        Args:
+            mode: Safe mode type (0=RESET, 1=HOLD)
+                - 0 (RESET): Traditional behavior - reset pins to INPUT on communication loss
+                - 1 (HOLD): New behavior - maintain pin states and continue executing queued commands
+
+        Returns:
+            True if safe mode was set successfully, False otherwise
+
+        Example:
+            >>> esp.set_safe_mode(1)  # Set to HOLD mode for robotic applications
+        """
+        try:
+            response = self._send_command(f"SAFE_MODE_SET {mode}")
+            return response is not None and "Safe mode set" in response
+        except (ValueError, IOError):
+            return False
+
+    def get_safe_mode(self) -> Dict[str, Any]:
+        """
+        Get the current safe mode configuration.
+
+        Returns:
+            Dictionary containing safe mode information:
+            - 'mode_name': String name ('RESET' or 'HOLD')
+            - 'mode_value': Numeric value (0 or 1)
+
+        Example:
+            >>> mode_info = esp.get_safe_mode()
+            >>> print(f"Current mode: {mode_info['mode_name']}")
+        """
+        try:
+            response = self._send_command("SAFE_MODE_GET")
+            if response and ":" in response:
+                # Parse response format: <SAFE_MODE:HOLD,1>
+                parts = response.split(":")
+                if len(parts) >= 2:
+                    mode_data = parts[1].rstrip(">")
+                    mode_parts = mode_data.split(",")
+                    if len(mode_parts) >= 2:
+                        return {
+                            'mode_name': mode_parts[0],
+                            'mode_value': int(mode_parts[1])
+                        }
+        except (ValueError, IOError):
+            pass
+        return {'mode_name': 'RESET', 'mode_value': 0}  # Default fallback
+
+    def restore_pin_states(self) -> bool:
+        """
+        Restore pin states from safe mode tracking (HOLD mode only).
+
+        This command is only available when in HOLD safe mode and is useful for
+        testing and debugging purposes.
+
+        Returns:
+            True if pin states were restored successfully, False otherwise
+
+        Example:
+            >>> esp.set_safe_mode(1)  # Set to HOLD mode first
+            >>> esp.restore_pin_states()  # Restore tracked pin states
+        """
+        try:
+            response = self._send_command("SAFE_MODE_RESTORE")
+            return response is not None and "Pin states restored" in response
+        except (ValueError, IOError):
+            return False
 
     # PWM Functions
     def pwm_init(self, pin: int, frequency: int = 5000, resolution: int = 8) -> int:

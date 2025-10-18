@@ -129,7 +129,7 @@ Current memory footprint:
 
 ## Version Information
 
-- **Firmware Version:** 0.1.6-beta
+- **Firmware Version:** 0.1.7-beta
 - **Architecture:** Modular with clean separation of concerns
 - **Last Updated:** 2025-01-09
 - **Status:** Production ready

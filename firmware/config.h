@@ -6,7 +6,7 @@
 // ============================================================================
 
 // Firmware Version
-#define FW_VERSION "0.1.6-beta"
+#define FW_VERSION "0.1.7-beta"
 
 // Serial Communication
 #define BAUD_RATE 115200
@@ -21,6 +21,13 @@
 #define FAILSAFE_TIMEOUT 10000       // 10 seconds of no commands before warning
 #define FAILSAFE_GRACE_PERIOD 20000  // 20 seconds grace period before engaging failsafe
 #define FAILSAFE_RECOVERY_TIMEOUT 5000 // 5 seconds to recover from failsafe
+
+// Safe Mode Types
+#define SAFE_MODE_RESET 0            // Reset pins to INPUT (default behavior)
+#define SAFE_MODE_HOLD 1             // Hold last position and continue executing queued commands
+
+// Safe Mode Configuration
+#define DEFAULT_SAFE_MODE SAFE_MODE_RESET  // Default safe mode behavior
 
 // Hardware Configuration
 #define MAX_PINS 40                  // Maximum number of GPIO pins

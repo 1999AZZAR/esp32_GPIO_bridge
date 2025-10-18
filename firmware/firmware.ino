@@ -27,6 +27,12 @@ bool adcInitialized = false;
 esp_adc_cal_characteristics_t *adc_chars = NULL;
 bool outputCommandsSent = false;  // Track if any output commands were sent
 
+// Safe mode configuration and pin state tracking
+uint8_t currentSafeMode = DEFAULT_SAFE_MODE;  // Current safe mode type
+uint8_t lastPinModes[MAX_PINS] = {0};         // Last pin modes (INPUT=0, OUTPUT=1, etc.)
+uint8_t lastPinValues[MAX_PINS] = {0};        // Last pin values (LOW=0, HIGH=1)
+bool pinStatesTracked[MAX_PINS] = {false};    // Track if pin state is recorded
+
 // Command buffer for optimized char-based parsing (replaces String)
 char cmdBuffer[CMD_BUFFER_SIZE];
 int cmdIndex = 0;
@@ -57,6 +63,27 @@ int8_t pinToPWMChannel[MAX_PINS];  // -1 = unused
 TaskHandle_t serialTaskHandle;
 TaskHandle_t failsafeTaskHandle;
 SemaphoreHandle_t sharedDataMutex;
+
+// Pin state tracking functions for safe mode
+void trackPinState(int pin, uint8_t mode, uint8_t value) {
+  if (pin >= 0 && pin < MAX_PINS) {
+    lastPinModes[pin] = mode;
+    lastPinValues[pin] = value;
+    pinStatesTracked[pin] = true;
+  }
+}
+
+void restorePinStates() {
+  for (int i = 0; i < MAX_PINS; i++) {
+    if (pinStatesTracked[i] && configuredPins[i]) {
+      // Restore pin mode and value
+      pinMode(i, lastPinModes[i]);
+      if (lastPinModes[i] == OUTPUT) {
+        digitalWrite(i, lastPinValues[i]);
+      }
+    }
+  }
+}
 
 // Queue management functions (v0.1.6-beta)
 bool enqueueCommand(const char* cmd) {
@@ -220,7 +247,8 @@ void serialTask(void* parameter) {
     }
     
     // Phase 2: Process queued commands in batch
-    if (queueCount > 0) {
+    // Continue processing queued commands even in SAFE_MODE_HOLD failsafe
+    if (queueCount > 0 && (!failsafeEngaged || currentSafeMode == SAFE_MODE_HOLD)) {
       if (xSemaphoreTake(sharedDataMutex, portMAX_DELAY) == pdTRUE) {
         // Process up to 5 commands per batch for optimal throughput
         int batchSize = min(queueCount, 5);
@@ -304,21 +332,25 @@ void checkFailsafe(unsigned long currentTime) {
 
 void engageFailsafe() {
     Serial.println("<WARN:Failsafe engaged - Communication lost>");
-    Serial.println("<INFO:All configured pins reset to INPUT mode for safety>");
-
-    // Reset all configured pins to INPUT mode
-    for (int i = 0; i < MAX_PINS; i++) {
-        if (configuredPins[i]) {
-            pinMode(i, INPUT);
-            configuredPins[i] = false;
-            Serial.println("<INFO:Reset pin " + String(i) + " to INPUT>");
+    
+    if (currentSafeMode == SAFE_MODE_RESET) {
+        Serial.println("<INFO:Reset mode - All configured pins reset to INPUT mode for safety>");
+        // Reset all configured pins to INPUT mode
+        for (int i = 0; i < MAX_PINS; i++) {
+            if (configuredPins[i]) {
+                pinMode(i, INPUT);
+                configuredPins[i] = false;
+                Serial.println("<INFO:Reset pin " + String(i) + " to INPUT>");
+            }
         }
+        Serial.println("<INFO:Failsafe active - Waiting for communication recovery>");
+    } else if (currentSafeMode == SAFE_MODE_HOLD) {
+        Serial.println("<INFO:Hold mode - Pins maintain last position, queued commands will continue executing>");
+        Serial.println("<INFO:Failsafe active - Communication lost but operation continues>");
     }
 
     failsafeEngaged = true;
     failsafeWarningSent = false; // Reset warning state
-
-    Serial.println("<INFO:Failsafe active - Waiting for communication recovery>");
 }
 
 void disengageFailsafe() {
@@ -374,9 +406,13 @@ void processCommand(char* cmd) {
         addToResponse("<STATUS:");
         addToResponse(failsafeEngaged ? "FAILSAFE" : "NORMAL");
         addToResponse(",");
+        addToResponse(currentSafeMode == SAFE_MODE_RESET ? "RESET" : "HOLD");
+        addToResponse(",");
         addToResponse(millis() - lastCommandTime);
         addToResponse(",");
         addToResponse(millis() - lastPingTime);
+        addToResponse(",");
+        addToResponse(queueCount);
         addToResponse(">");
         sendResponse();
     }
@@ -387,6 +423,38 @@ void processCommand(char* cmd) {
             // OK response removed (v0.1.4 optimization)
         } else {
             Serial.println("<INFO:Failsafe not engaged>");
+        }
+    }
+    else if (strcmp(action, "SAFE_MODE_SET") == 0 && partCount >= 2) {
+        int mode = atoi(parts[1]);
+        if (mode == SAFE_MODE_RESET || mode == SAFE_MODE_HOLD) {
+            currentSafeMode = mode;
+            clearResponse();
+            addToResponse("<INFO:Safe mode set to ");
+            addToResponse(mode == SAFE_MODE_RESET ? "RESET" : "HOLD");
+            addToResponse(">");
+            sendResponse();
+        } else {
+            Serial.println("<ERROR:Invalid safe mode. Use 0 for RESET or 1 for HOLD>");
+        }
+    }
+    else if (strcmp(action, "SAFE_MODE_GET") == 0) {
+        clearResponse();
+        addToResponse("<SAFE_MODE:");
+        addToResponse(currentSafeMode == SAFE_MODE_RESET ? "RESET" : "HOLD");
+        addToResponse(",");
+        addToResponse(currentSafeMode);
+        addToResponse(">");
+        sendResponse();
+    }
+    else if (strcmp(action, "SAFE_MODE_RESTORE") == 0) {
+        if (currentSafeMode == SAFE_MODE_HOLD) {
+            restorePinStates();
+            clearResponse();
+            addToResponse("<INFO:Pin states restored from safe mode tracking>");
+            sendResponse();
+        } else {
+            Serial.println("<INFO:Pin state restore only available in HOLD safe mode>");
         }
     }
     // Command dispatch - char buffer parsing complete, handlers use String for simplicity

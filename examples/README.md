@@ -256,6 +256,48 @@ robot.pose_point()
 robot.sequence_dance()
 ```
 
+### Safe Mode Example (NEW in v0.1.7-beta)
+
+```bash
+python safe_mode_example.py
+```
+
+This example demonstrates the new dual safe mode functionality:
+
+**Key Features:**
+- **RESET Mode (Default)**: Traditional failsafe behavior that resets pins to INPUT on communication loss
+- **HOLD Mode (New)**: Maintains pin states and continues executing queued commands during communication loss
+- **Pin State Tracking**: System tracks last pin modes and values for restoration
+- **Enhanced Status Reporting**: Shows safe mode type and queued command count
+- **Robotic Scenario Demo**: Shows how HOLD mode benefits robotic applications
+
+**Safe Mode Commands:**
+```python
+# Set safe mode
+esp.set_safe_mode(0)  # RESET mode (default)
+esp.set_safe_mode(1)  # HOLD mode (new)
+
+# Get current safe mode
+mode_info = esp.get_safe_mode()
+print(f"Mode: {mode_info['mode_name']} (value: {mode_info['mode_value']})")
+
+# Restore pin states (HOLD mode only)
+esp.restore_pin_states()
+
+# Enhanced status with safe mode info
+status = esp.get_status()
+print(f"Safe mode: {status['safe_mode']}")
+print(f"Queued commands: {status['queued_commands']}")
+```
+
+**Use Cases:**
+- **RESET Mode**: Safety-critical applications, general-purpose use
+- **HOLD Mode**: Robotic applications, continuous operation, servo control
+
+**Hardware Setup:**
+- LED connected to GPIO pin 2 (optional, for visual demonstration)
+- ESP32 GPIO Bridge firmware v0.1.7-beta or later
+
 ## Troubleshooting
 
 ### Common Issues
@@ -329,17 +371,18 @@ Reading  2: Raw=1203, Voltage=0.97V, Percentage= 29.4%
 
 ## Example Files Overview
 
-| Example | Description | Hardware | v0.1.5-beta Features |
+| Example | Description | Hardware | v0.1.7-beta Features |
 |---------|-------------|----------|---------------------|
 | `basic_io_example.py` | Digital/analog I/O basics | LED, potentiometer | ✅ Optimized |
 | `sensor_hub_example.py` | I2C sensor integration | I2C sensors | ✅ Batch operations |
 | `advanced_features_example.py` | PWM, EEPROM, batch ops | LEDs, motor | ✅ Dual-core |
 | `pwm_servo_control.py` | Single servo control | SG90 servo | ✅ Optimized PWM |
-| `arduino_arm_robot.py` | **NEW** Multi-servo robot | 6x SG90 servos | ✅ **Full v0.1.5-beta** |
+| `arduino_arm_robot.py` | Multi-servo robot | 6x SG90 servos | ✅ **Full v0.1.5-beta** |
 | `led_patterns_example.py` | LED animation patterns | Multiple LEDs | ✅ Batch processing |
 | `multi_sensor_dashboard.py` | Real-time sensor monitoring | Multiple sensors | ✅ Performance |
 | `ultrasonic_distance_meter.py` | Distance measurement | HC-SR04 sensor | ✅ Optimized |
 | `digital_thermometer_logger.py` | Temperature logging | TMP36 sensor | ✅ Data logging |
+| `safe_mode_example.py` | **NEW** Dual safe mode demo | LED (optional) | ✅ **v0.1.7-beta** |
 
 ## Extending Examples
 

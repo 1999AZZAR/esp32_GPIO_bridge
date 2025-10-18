@@ -22,7 +22,7 @@ if requirements_file.exists():
 
 setup(
     name="esp32-gpio-bridge",
-    version="0.1.4-beta",
+    version="0.1.7-beta",
     author="ESP32 GPIO Bridge Project",
     author_email="info@esp32-gpio-bridge.org",
     description="Python library for controlling ESP32 GPIO pins via USB serial connection",

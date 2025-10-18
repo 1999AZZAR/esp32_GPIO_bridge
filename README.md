@@ -1,6 +1,6 @@
 # ESP32 GPIO Bridge
 
-**Version:** 0.1.6-beta
+**Version:** 0.1.7-beta
 
 ## Overview
 
@@ -8,13 +8,41 @@ ESP32 GPIO Bridge transforms an ESP32 development board into a versatile, PC-con
 
 The system communicates over a simple, text-based serial protocol via USB connection, providing a comprehensive Python library for GPIO control, PWM, I2C communication, EEPROM storage, and sensor integration.
 
-**New in v0.1.6-beta:** Complete architectural refactoring with professional modular firmware design. Transformed from monolithic single-file architecture to 8 specialized modules with 54% reduction in main file size and dramatically improved maintainability!
+**New in v0.1.7-beta:** Dual Safe Mode implementation with two distinct failsafe behaviors - RESET mode (traditional) and HOLD mode (maintains pin states and continues executing queued commands during communication loss). Perfect for robotic applications and continuous operation scenarios!
+
+**Previous v0.1.6-beta:** Complete architectural refactoring with professional modular firmware design. Transformed from monolithic single-file architecture to 8 specialized modules with 54% reduction in main file size and dramatically improved maintainability!
 
 **Previous v0.1.5-beta:** Advanced dual-core architecture with FreeRTOS tasks, command queuing system, and optimized serial responses. Professional-grade performance with 5-10x faster command throughput.
 
 **Previous v0.1.4-beta:** Major performance optimizations with 2-3x faster operations, zero queue contamination, and 99.99% reduction in CPU overhead.
 
 **Previous v0.1.3-beta:** WiFi and Bluetooth are disabled by default to maximize GPIO performance and free up resources for extensive peripheral usage.
+
+## What's New in v0.1.7-beta
+
+**Dual Safe Mode Implementation:**
+
+### Two Distinct Safe Mode Behaviors
+- **RESET Mode (Default)**: Traditional failsafe behavior that resets all pins to INPUT mode when communication is lost
+- **HOLD Mode (New)**: Maintains pin states and continues executing queued commands even when communication is lost
+
+### Key Features
+- **Configurable Safe Mode**: Switch between RESET and HOLD modes via SAFE_MODE_SET command
+- **Pin State Tracking**: System tracks last pin modes and values for HOLD mode restoration
+- **Command Queue Continuation**: In HOLD mode, queued commands continue executing even during failsafe
+- **Enhanced Status Reporting**: STATUS command shows active safe mode type and queue count
+
+### Use Cases
+- **RESET Mode**: Safety-critical applications where pins must be disabled on communication loss
+- **HOLD Mode**: Robotic applications, continuous operation scenarios, servo control where position must be maintained
+
+### New Commands
+- `SAFE_MODE_SET 0/1` - Configure safe mode type (0=RESET, 1=HOLD)
+- `SAFE_MODE_GET` - Get current safe mode
+- `SAFE_MODE_RESTORE` - Restore pin states (for testing/debugging)
+- Enhanced `STATUS` command with safe mode information
+
+**Result:** Perfect for robotic applications and continuous operation scenarios where maintaining pin states during communication interruptions is critical!
 
 ## What's New in v0.1.6-beta
 
@@ -701,12 +729,6 @@ See `examples/README.md` for detailed setup instructions, wiring diagrams, and t
 - **Optimized failsafe checks** - 99.99% less CPU overhead
 - **ESP32 error message filtering** - Robust handling of system messages
 
-### Optimization Guide
-
-For detailed technical information and future optimization roadmap:
-
-**[FIRMWARE_OPTIMIZATION_GUIDE.md](FIRMWARE_OPTIMIZATION_GUIDE.md)**
-
 **Result:** Maximum performance with professional-grade dual-core architecture and production-ready stability!
 
 ## Command Protocol Reference
@@ -722,6 +744,9 @@ Communication uses **115200 baud** with commands/responses wrapped in `<...>` de
 | `RESET_FAILSAFE`                       | None                              | Manually disengage failsafe mode       |
 | `CLEAR_FAILSAFE`                       | None                              | Manually disengage failsafe mode       |
 | `DISABLE_FAILSAFE`                     | None                              | Manually disengage failsafe mode       |
+| `SAFE_MODE_SET <mode>`                 | mode: 0 (RESET) or 1 (HOLD)      | Configure safe mode behavior           |
+| `SAFE_MODE_GET`                        | None                              | Get current safe mode type             |
+| `SAFE_MODE_RESTORE`                    | None                              | Restore pin states (HOLD mode only)    |
 | `MODE <pin> <mode>`                    | pin: 0-39, mode: IN/OUT/IN_PULLUP | Set pin mode                           |
 | `WRITE <pin> <value>`                  | pin: 0-39, value: 0/1             | Digital write                          |
 | `READ <pin>`                           | pin: 0-39                         | Digital read (returns 0/1)             |
