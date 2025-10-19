@@ -99,6 +99,15 @@ class ESP32GPIO:
         except serial.SerialException as e:
             raise IOError(f"Failed to connect to ESP32 on {self.port}: {e}")
 
+    def is_connected(self) -> bool:
+        """
+        Check if connected to ESP32.
+
+        Returns:
+            True if connected, False otherwise
+        """
+        return self.ser is not None and self.ser.is_open and self._is_running
+
     def _drain_boot_messages(self, duration: float = 1.0) -> None:
         """
         Drain boot messages and garbage data from serial buffer.
@@ -424,13 +433,81 @@ class ESP32GPIO:
             pass
         return {'state': 'UNKNOWN', 'safe_mode': 'RESET', 'failsafe_engaged': self.failsafe_engaged}
 
+    def get_identity(self) -> str:
+        """
+        Get device identity information.
+
+        Returns:
+            Device identity string
+        """
+        if not self.is_connected():
+            return "ESP32 GPIO Bridge (Not connected)"
+
+        try:
+            with self.lock:
+                response = self._send_command("IDENTITY", expect_response=True)
+                return response if response else "ESP32 GPIO Bridge"
+                
+        except Exception as e:
+            return f"ESP32 GPIO Bridge (Error: {e})"
+
+    def ping(self) -> str:
+        """
+        Send a ping command to test communication.
+
+        Returns:
+            Response from ESP32 (should be "PONG")
+        """
+        if not self.is_connected():
+            return "NOT_CONNECTED"
+
+        try:
+            with self.lock:
+                response = self._send_command("PING", expect_response=True)
+                return response if response else "NO_RESPONSE"
+                
+        except Exception as e:
+            return f"ERROR: {e}"
+
+    def get_pin_capabilities(self, pin: int) -> Dict[str, bool]:
+        """
+        Get pin capabilities information.
+
+        Args:
+            pin: Pin number to check
+
+        Returns:
+            Dict containing pin capabilities
+        """
+        if not self.is_connected():
+            return {"digital_write": False, "digital_read": False, "analog_read": False, "pwm": False}
+
+        # Return default capabilities based on ESP32 pin specifications
+        # This avoids hanging on unsupported commands
+        capabilities = {
+            "digital_write": True,   # Most GPIO pins support digital write
+            "digital_read": True,    # Most GPIO pins support digital read
+            "analog_read": False,    # Only specific pins support analog read
+            "pwm": False            # PWM capability depends on pin
+        }
+        
+        # ESP32 analog input pins (ADC1 and ADC2)
+        if pin in [32, 33, 34, 35, 36, 39]:
+            capabilities["analog_read"] = True
+        
+        # ESP32 PWM-capable pins (most GPIO pins support PWM)
+        if pin not in [34, 35, 36, 39]:  # Exclude input-only pins
+            capabilities["pwm"] = True
+            
+        return capabilities
+
     def set_pin_mode(self, pin: int, mode: str) -> None:
         """
         Set GPIO pin mode.
 
         Args:
             pin: GPIO pin number (0-39)
-            mode: Pin mode ('IN', 'OUT', or 'IN_PULLUP')
+            mode: Pin mode ('IN', 'OUT', 'IN_PULLUP', or 'IN_PULLDOWN')
 
         Raises:
             ValueError: If pin or mode is invalid
@@ -439,8 +516,8 @@ class ESP32GPIO:
             raise ValueError(f"Invalid pin number: {pin}. Must be 0-39.")
 
         mode = mode.upper()
-        if mode not in ['IN', 'OUT', 'IN_PULLUP']:
-            raise ValueError(f"Invalid mode: {mode}. Must be 'IN', 'OUT', or 'IN_PULLUP'.")
+        if mode not in ['IN', 'OUT', 'IN_PULLUP', 'IN_PULLDOWN']:
+            raise ValueError(f"Invalid mode: {mode}. Must be 'IN', 'OUT', 'IN_PULLUP', or 'IN_PULLDOWN'.")
 
         self._send_command(f"MODE {pin} {mode}", expect_response=False)
 
@@ -514,6 +591,44 @@ class ESP32GPIO:
             raise ValueError(f"Invalid DAC value: {value}. Must be between 0 and 255.")
 
         self._send_command(f"AWRITE {pin} {value}", expect_response=False)
+
+    def analog_read_voltage(self, pin: int) -> float:
+        """
+        Read analog voltage from ADC pin.
+
+        Args:
+            pin: ADC pin number (32-39)
+
+        Returns:
+            Voltage value in volts (0.0-3.3V)
+
+        Raises:
+            ValueError: If pin is not a valid ADC pin
+        """
+        raw_value = self.analog_read(pin)
+        # Convert 12-bit ADC value to voltage (ESP32 ADC reference is 3.3V)
+        voltage = (raw_value / 4095.0) * 3.3
+        return voltage
+
+    def analog_write_voltage(self, pin: int, voltage: float) -> None:
+        """
+        Write analog voltage to DAC pin.
+
+        Args:
+            pin: DAC pin number (25 or 26)
+            voltage: Voltage value in volts (0.0-3.3V)
+
+        Raises:
+            ValueError: If pin or voltage is invalid
+        """
+        if pin not in [25, 26]:
+            raise ValueError(f"Invalid DAC pin: {pin}. Must be 25 or 26.")
+        if not 0.0 <= voltage <= 3.3:
+            raise ValueError(f"Invalid voltage: {voltage}. Must be between 0.0 and 3.3 volts.")
+        
+        # Convert voltage to 8-bit DAC value (ESP32 DAC reference is 3.3V)
+        dac_value = int((voltage / 3.3) * 255)
+        self.analog_write(pin, dac_value)
 
     def get_configured_pins(self) -> List[int]:
         """
@@ -1072,80 +1187,28 @@ def find_esp32_port(timeout: float = 2.0) -> Optional[str]:
     
     logger.debug(f"Testing {len(likely_ports)} port(s) for ESP32 GPIO Bridge")
     
-    # Test each port by sending IDENTIFY command
+    # Test each port by attempting ESP32GPIO connection
     for port in likely_ports:
         try:
             logger.debug(f"Probing {port}...")
             
-            # Open port with DTR/RTS disabled to prevent auto-reset
-            ser = serial.Serial(
-                port, 
-                115200, 
-                timeout=timeout,
-                dsrdtr=False,  # Disable DTR to prevent reset
-                rtscts=False   # Disable RTS
-            )
+            # Try to create ESP32GPIO connection with short timeout
+            esp = ESP32GPIO(port, timeout=timeout, auto_connect=True)
             
-            # Wait for any auto-reset to complete and ESP32 to boot
-            time.sleep(0.3)
+            # Test if we can get version (this confirms ESP32 is responding)
+            try:
+                version = esp.get_version()
+                if version and "0.1.8-beta" in version:
+                    esp.close()
+                    logger.info(f"Found ESP32 GPIO Bridge on {port}")
+                    return port
+            except:
+                pass
             
-            # Drain boot messages
-            start_drain = time.time()
-            while (time.time() - start_drain) < 0.5:
-                if ser.in_waiting:
-                    try:
-                        ser.read(ser.in_waiting)
-                    except:
-                        pass
-                time.sleep(0.05)
+            esp.close()
             
-            # Clear buffer one more time
-            ser.reset_input_buffer()
-            
-            # Try multiple times with PING first (fastest, safest)
-            for attempt in range(3):
-                ser.write(b"<PING>")
-                time.sleep(0.1)
-                
-                start_time = time.time()
-                while (time.time() - start_time) < 0.5:
-                    if ser.in_waiting:
-                        try:
-                            line = ser.readline().decode('utf-8', errors='ignore').strip()
-                            if "PONG" in line:
-                                ser.close()
-                                logger.info(f"Found ESP32 GPIO Bridge on {port}")
-                                return port
-                        except:
-                            pass
-                    time.sleep(0.01)
-                
-                time.sleep(0.1)
-            
-            # Try IDENTIFY command
-            ser.write(b"<IDENTIFY>")
-            time.sleep(0.1)
-            
-            start_time = time.time()
-            while (time.time() - start_time) < 0.5:
-                if ser.in_waiting:
-                    try:
-                        line = ser.readline().decode('utf-8', errors='ignore').strip()
-                        if "ESP32_GPIO_BRIDGE" in line:
-                            ser.close()
-                            logger.info(f"Found ESP32 GPIO Bridge on {port}")
-                            return port
-                    except:
-                        pass
-                time.sleep(0.01)
-            
-            ser.close()
-            
-        except (serial.SerialException, OSError, PermissionError) as e:
-            logger.debug(f"Could not probe {port}: {e}")
-            continue
         except Exception as e:
-            logger.debug(f"Unexpected error probing {port}: {e}")
+            logger.debug(f"Could not probe {port}: {e}")
             continue
     
     logger.warning("ESP32 GPIO Bridge not found on any port")

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-ESP32 GPIO Bridge - Stress Test Example
+ESP32 GPIO Bridge - Comprehensive Stress Test
 
-This example demonstrates the robustness of the ESP32 GPIO Bridge firmware
+This test demonstrates the robustness of the ESP32 GPIO Bridge firmware
 by running comprehensive stress tests that simulate conditions that previously
 caused the ESP32 to become unresponsive.
 
@@ -16,11 +16,11 @@ Features tested:
 - Extended high load scenarios
 - Reconnection after idle periods
 
-This example is designed to verify that the ultra-robust firmware
-(v0.1.8-beta-ultra-robust) maintains stable operation under all conditions.
+This test is designed to verify that the production-ready firmware
+(v0.1.8-beta) maintains stable operation under all conditions.
 
 Author: ESP32 GPIO Bridge Team
-Version: 0.1.8-beta-robust
+Version: 0.1.8-beta
 """
 
 import time
@@ -30,13 +30,13 @@ from esp32_gpio_bridge import ESP32GPIO, find_esp32_port
 def print_header(title):
     """Print a formatted header for test sections."""
     print(f"\n{'='*80}")
-    print(f"🧪 {title}")
+    print(f"TEST: {title}")
     print(f"{'='*80}")
 
 def print_test_result(test_name, success, duration=None, operations=None):
     """Print formatted test results."""
-    status = "✅" if success else "❌"
-    result_text = f"{status} {test_name}"
+    status = "PASS" if success else "FAIL"
+    result_text = f"[{status}] {test_name}"
     
     if duration is not None:
         result_text += f" - Completed in {duration:.2f} seconds"
@@ -207,23 +207,23 @@ def test_final_functionality(esp):
 
 def run_comprehensive_stress_test():
     """Run comprehensive stress test suite."""
-    print_header("COMPREHENSIVE STRESS TEST - ESP32 GPIO Bridge v0.1.8-beta-ultra-robust")
+    print_header("COMPREHENSIVE STRESS TEST - ESP32 GPIO Bridge v0.1.8-beta")
     
     # Auto-detect ESP32 port
     port = find_esp32_port()
     if not port:
-        print("❌ ESP32 GPIO Bridge not found!")
+        print("[ERROR] ESP32 GPIO Bridge not found!")
         print("\nTroubleshooting:")
         print("1. Make sure your ESP32 is connected via USB")
         print("2. Ensure the firmware (esp32_GPIO_bridge.ino) is flashed")
         print("3. Check that no other program is using the serial port")
         return False
     
-    print(f"✅ Found ESP32 GPIO Bridge on port: {port}")
+    print(f"[SUCCESS] Found ESP32 GPIO Bridge on port: {port}")
     
     try:
         with ESP32GPIO(port) as esp:
-            print(f"✅ Connected to firmware version: {esp.get_version()}")
+            print(f"[SUCCESS] Connected to firmware version: {esp.get_version()}")
             
             # Run all stress tests
             tests_passed = 0
@@ -261,27 +261,27 @@ def run_comprehensive_stress_test():
             print(f"Tests passed: {tests_passed}/{total_tests}")
             
             if tests_passed == total_tests:
-                print("🎉 ALL STRESS TESTS COMPLETED SUCCESSFULLY!")
-                print("🛡️ Ultra-robust firmware handled all stress conditions!")
-                print("🚀 Serial communication remained stable throughout!")
-                print("⚡ Hardware watchdog and task recovery working perfectly!")
-                print("✅ ESP32 remained responsive during all tests!")
-                print("\n🔧 The unresponsive state issue has been resolved!")
+                print("[SUCCESS] ALL STRESS TESTS COMPLETED SUCCESSFULLY!")
+                print("[INFO] Production-ready firmware handled all stress conditions!")
+                print("[INFO] Serial communication remained stable throughout!")
+                print("[INFO] Hardware watchdog and task recovery working perfectly!")
+                print("[SUCCESS] ESP32 remained responsive during all tests!")
+                print("\n[SUCCESS] The unresponsive state issue has been resolved!")
                 return True
             else:
-                print(f"❌ {total_tests - tests_passed} tests failed!")
-                print("This indicates the unresponsive state issue still exists.")
+                print(f"[FAIL] {total_tests - tests_passed} tests failed!")
+                print("[ERROR] This indicates the unresponsive state issue still exists.")
                 return False
                 
     except Exception as e:
-        print(f"❌ Stress test failed with error: {e}")
-        print("This indicates the ESP32 became unresponsive during testing.")
+        print(f"[ERROR] Stress test failed with error: {e}")
+        print("[ERROR] This indicates the ESP32 became unresponsive during testing.")
         return False
 
 def main():
     """Main function."""
     print("ESP32 GPIO Bridge - Comprehensive Stress Test")
-    print("This test verifies that the ultra-robust firmware maintains")
+    print("This test verifies that the production-ready firmware maintains")
     print("stable operation under all stress conditions.")
     print("\nPress Ctrl+C to cancel the test at any time.")
     
@@ -289,7 +289,7 @@ def main():
         success = run_comprehensive_stress_test()
         sys.exit(0 if success else 1)
     except KeyboardInterrupt:
-        print("\n\n⚠️ Stress test cancelled by user.")
+        print("\n\n[WARNING] Stress test cancelled by user.")
         sys.exit(1)
 
 if __name__ == "__main__":

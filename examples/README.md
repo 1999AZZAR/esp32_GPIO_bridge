@@ -257,50 +257,6 @@ robot.set_multiple_servos({
     'gripper': 0
 })
 
-### Stress Test Example (NEW in v0.1.8-beta-ultra-robust)
-
-```bash
-python stress_test_example.py
-```
-
-This comprehensive stress test verifies the robustness of the ultra-robust firmware:
-
-**Test Categories:**
-- **Rapid command sequences** (100 commands in rapid succession)
-- **Batch operations stress** (50 consecutive batch operations)
-- **PWM operations stress** (40 PWM channel allocations/deallocations)
-- **EEPROM operations stress** (60 EEPROM read/write operations)
-- **Mixed operations stress** (150 mixed command sequences)
-- **Long idle periods** (45 seconds of inactivity)
-- **Extended high load** (90 seconds of continuous high-frequency operations)
-- **Reconnection after idle** (Verifies communication recovery)
-- **Final functionality verification** (Comprehensive feature test)
-
-**Key Features:**
-- **26,000+ operations** in extended high load test
-- **Comprehensive error detection** and recovery verification
-- **Real-time performance monitoring** with timing statistics
-- **Automated pass/fail reporting** with detailed results
-- **Hardware watchdog verification** under stress conditions
-
-**Hardware Setup:**
-- LED connected to GPIO pin 2 (for visual feedback during tests)
-- Optional: Multiple LEDs on GPIO pins 12, 13, 14, 15 (for batch operations)
-- Optional: Motor with PWM control connected to GPIO pin 5
-- ESP32 GPIO Bridge firmware v0.1.8-beta-ultra-robust
-
-**Usage:**
-```python
-python stress_test_example.py
-```
-
-**Expected Results:**
-- All 9 tests should pass successfully
-- Total test duration: approximately 4-5 minutes
-- ESP32 should remain responsive throughout all tests
-- No unresponsive state issues should occur
-
-**Note:** This test is specifically designed to verify that the unresponsive state issue has been resolved. If the ESP32 becomes unresponsive during testing, the test will fail and indicate that the issue still exists.
 
 # Pre-programmed poses
 robot.pose_wave()
