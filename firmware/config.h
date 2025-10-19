@@ -18,8 +18,8 @@
 #define CMD_QUEUE_SIZE 32            // Command queuing system buffer size
 
 // Failsafe Configuration
-#define FAILSAFE_TIMEOUT 10000       // 10 seconds of no commands before warning
-#define FAILSAFE_GRACE_PERIOD 20000  // 20 seconds grace period before engaging failsafe
+#define FAILSAFE_TIMEOUT 30000       // 30 seconds of no commands before warning
+#define FAILSAFE_GRACE_PERIOD 60000  // 60 seconds grace period before engaging failsafe
 #define FAILSAFE_RECOVERY_TIMEOUT 5000 // 5 seconds to recover from failsafe
 
 // Safe Mode Types

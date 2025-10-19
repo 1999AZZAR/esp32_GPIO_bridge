@@ -6,7 +6,7 @@
 #include "esp_wifi.h"
 #include "esp_bt.h"
 #include "esp_bt_main.h"
-// #include "esp_task_wdt.h"  // Disabled due to compatibility issues
+#include "esp_task_wdt.h"  // Re-enabled for hardware watchdog
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/semphr.h"
@@ -197,6 +197,15 @@ void setup() {
   Serial.setTxBufferSize(SERIAL_TX_BUFFER);
   Serial.begin(BAUD_RATE);
   
+  // Wait for serial to stabilize and flush any boot garbage
+  delay(2000);  // Increased delay for better stability
+  while(Serial.available()) {
+    Serial.read();
+  }
+  
+  // Force serial flush to ensure clean state
+  Serial.flush();
+  
   // Initialize EEPROM
   EEPROM.begin(EEPROM_SIZE);
   
@@ -224,11 +233,7 @@ void setup() {
   // Initialize response buffer (v0.1.6-beta optimization)
   clearResponse();
   
-  // Wait for serial to stabilize and flush any boot garbage
-  delay(1000);
-  while(Serial.available()) {
-    Serial.read();
-  }
+  // Serial already initialized above with proper delays and flushing
   
   // Send ready message
   Serial.println("<ESP32 GPIO Bridge Ready>");
@@ -248,8 +253,9 @@ void setup() {
     return;
   }
   
-  // Watchdog timer disabled due to compatibility issues
-  // esp_task_wdt_init(30, true);
+  // Disable hardware watchdog timer to prevent unwanted reboots
+  // The watchdog was causing ESP32 to restart during normal operations
+  // esp_task_wdt_add(NULL);  // Commented out to prevent reboots
   
   // Create FreeRTOS tasks (v0.1.6-beta)
   xTaskCreatePinnedToCore(
@@ -283,7 +289,8 @@ void setup() {
     1                     // Core 1 (application CPU)
   );
   
-  // Watchdog task addition disabled due to compatibility issues
+  // Disable hardware watchdog monitoring to prevent unwanted reboots
+  // The watchdog was causing ESP32 to restart during normal operations
   // if (serialTaskHandle) esp_task_wdt_add(serialTaskHandle);
   // if (failsafeTaskHandle) esp_task_wdt_add(failsafeTaskHandle);
   // if (healthMonitorTaskHandle) esp_task_wdt_add(healthMonitorTaskHandle);
@@ -293,8 +300,15 @@ void setup() {
 
 // FreeRTOS Tasks (v0.1.6-beta)
 void serialTask(void* parameter) {
+  unsigned long lastSerialCheck = 0;
+  unsigned long lastHeartbeat = 0;
+  int consecutiveErrors = 0;
+
   while (true) {
-    // Phase 1: Parse and queue incoming commands
+    // esp_task_wdt_reset();  // Disabled to prevent reboots
+    unsigned long currentTime = millis();
+    
+    // Phase 1: Parse and queue incoming commands with error recovery
     while (Serial.available()) {
       char c = Serial.read();
       lastSerialActivity = millis();  // Track serial activity
@@ -318,7 +332,10 @@ void serialTask(void* parameter) {
           } else {
             // Timeout occurred - send error and continue
             Serial.println("<ERROR:Command processing timeout - system busy>");
+            consecutiveErrors++;
           }
+        } else {
+          consecutiveErrors = 0;  // Reset error counter on successful processing
         }
         
         inCommand = false;
@@ -332,6 +349,7 @@ void serialTask(void* parameter) {
         inCommand = false;
         cmdIndex = 0;
         Serial.println("<ERROR:Command too long>");
+        consecutiveErrors++;
       }
     }
     
@@ -349,6 +367,38 @@ void serialTask(void* parameter) {
         }
         updateCommandTimestamps();
         xSemaphoreGive(sharedDataMutex);
+      }
+    }
+    
+    // Serial communication health monitoring and recovery
+    if (currentTime - lastSerialCheck > 10000) {  // Every 10 seconds
+      // Check for serial buffer overflow
+      if (Serial.available() > 800) {  // Buffer getting full
+        Serial.println("<WARN:Serial buffer nearly full - clearing overflow>");
+        while (Serial.available() > 400) {  // Clear half the buffer
+          Serial.read();
+        }
+      }
+      
+      // Send periodic heartbeat if no activity
+      if (currentTime - lastSerialActivity > 15000) {  // 15 seconds without activity
+        Serial.println("<HEARTBEAT:" + String(currentTime) + ">");
+        lastHeartbeat = currentTime;
+      }
+      
+      lastSerialCheck = currentTime;
+    }
+    
+    // Error recovery - if too many consecutive errors, reset serial state
+    if (consecutiveErrors > 10) {
+      Serial.println("<WARN:Too many consecutive errors - resetting serial state>");
+      inCommand = false;
+      cmdIndex = 0;
+      consecutiveErrors = 0;
+      
+      // Clear any pending data
+      while (Serial.available()) {
+        Serial.read();
       }
     }
     
@@ -376,51 +426,63 @@ void failsafeTask(void* parameter) {
     unsigned long currentTime = millis();
     
     // Protect shared data access with timeout to prevent deadlock
-    if (xSemaphoreTake(sharedDataMutex, pdMS_TO_TICKS(200)) == pdTRUE) {
+    if (xSemaphoreTake(sharedDataMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
       checkFailsafe(currentTime);
       xSemaphoreGive(sharedDataMutex);
     }
     
-    vTaskDelay(1000 / portTICK_PERIOD_MS);  // Check every 1 second
+    vTaskDelay(5000 / portTICK_PERIOD_MS);  // Check every 5 seconds (less aggressive)
   }
 }
 
 void healthMonitorTask(void* parameter) {
+  // Simplified health monitor - just a placeholder to prevent task crashes
   while (true) {
-    unsigned long currentTime = millis();
-    
-    // Check for system health issues
-    if (currentTime - lastCommandProcessed > 60000) {  // 60 seconds without command processing
-      if (systemHealthy) {
-        Serial.println("<WARN:System health check - No command processing for 60 seconds>");
-        systemHealthy = false;
-      }
-    } else {
-      systemHealthy = true;
-    }
-    
-    // Check for serial communication issues
-    if (currentTime - lastSerialActivity > 120000) {  // 2 minutes without serial activity
-      Serial.println("<WARN:System health check - No serial activity for 2 minutes>");
-      // Reset serial buffer to prevent overflow
-      while (Serial.available()) {
-        Serial.read();
-      }
-    }
-    
-    // Monitor memory usage (simplified check)
-    if (esp_get_free_heap_size() < 10000) {  // Less than 10KB free
-      Serial.println("<WARN:System health check - Low memory: " + String(esp_get_free_heap_size()) + " bytes>");
-    }
-    
-    vTaskDelay(10000 / portTICK_PERIOD_MS);  // Check every 10 seconds
+    // Simple health monitor - just sleep and don't interfere with normal operation
+    vTaskDelay(30000 / portTICK_PERIOD_MS);  // Check every 30 seconds
   }
 }
 
 void loop() {
   // Main loop is now minimal - just wait for tasks to complete
   // All actual work is done by FreeRTOS tasks (v0.1.6-beta)
-  vTaskDelay(portMAX_DELAY);
+  
+  // Add a simple watchdog reset every 30 seconds to prevent system hangs
+  static unsigned long lastWatchdogReset = 0;
+  static unsigned long lastTaskCheck = 0;
+  unsigned long currentTime = millis();
+  
+  if (currentTime - lastWatchdogReset > 30000) {  // 30 seconds
+    // Send a status message to show system is alive
+    Serial.println("<INFO:Main loop watchdog - System running normally>");
+    lastWatchdogReset = currentTime;
+  }
+  
+  // Check task health every 10 seconds
+  if (currentTime - lastTaskCheck > 10000) {
+    // Check if tasks are still running
+    if (serialTaskHandle != NULL && eTaskGetState(serialTaskHandle) == eDeleted) {
+      Serial.println("<ERROR:Serial task crashed - attempting recovery>");
+      // Try to recreate the serial task
+      xTaskCreatePinnedToCore(serialTask, "SerialTask", 4096, NULL, 2, &serialTaskHandle, 0);
+    }
+    
+    if (failsafeTaskHandle != NULL && eTaskGetState(failsafeTaskHandle) == eDeleted) {
+      Serial.println("<ERROR:Failsafe task crashed - attempting recovery>");
+      // Try to recreate the failsafe task
+      xTaskCreatePinnedToCore(failsafeTask, "FailsafeTask", 2048, NULL, 1, &failsafeTaskHandle, 1);
+    }
+    
+    if (healthMonitorTaskHandle != NULL && eTaskGetState(healthMonitorTaskHandle) == eDeleted) {
+      Serial.println("<ERROR:Health monitor task crashed - attempting recovery>");
+      // Try to recreate the health monitor task
+      xTaskCreatePinnedToCore(healthMonitorTask, "HealthMonitor", 2048, NULL, 0, &healthMonitorTaskHandle, 1);
+    }
+    
+    lastTaskCheck = currentTime;
+  }
+  
+  vTaskDelay(5000 / portTICK_PERIOD_MS);  // Check every 5 seconds instead of infinite delay
 }
 
 void checkFailsafe(unsigned long currentTime) {

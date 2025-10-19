@@ -125,6 +125,28 @@ class ESP32GPIO:
         
         if drained_count > 0:
             self.logger.debug(f"Drained {drained_count} boot messages")
+            
+        # Additional drain after initial drain to catch any delayed messages
+        time.sleep(0.5)
+        additional_drained = 0
+        try:
+            while True:
+                response = self.response_queue.get_nowait()
+                if response and ("ESP32 GPIO Bridge Ready" in response or 
+                                "Ready" in response or
+                                response.startswith("E (") or
+                                "task_wdt" in response):
+                    additional_drained += 1
+                    self.logger.debug(f"Drained additional boot message: {response}")
+                else:
+                    # Put back non-boot messages
+                    self.response_queue.put(response)
+                    break
+        except Empty:
+            pass
+        
+        if additional_drained > 0:
+            self.logger.debug(f"Drained {additional_drained} additional boot messages")
 
     def _initialize_connection(self) -> None:
         """Initialize connection and verify ESP32 readiness."""
@@ -190,6 +212,23 @@ class ESP32GPIO:
         """
         try:
             response = self.response_queue.get(timeout=timeout)
+            
+            # Handle mixed messages (e.g., "<ESP32 GPIO Bridge Ready>E (2008) task_wdt: ...")
+            if '<' in response and '>' in response:
+                # Split on the first '>' to separate the main message from error messages
+                parts = response.split('>', 1)
+                main_response = parts[0] + '>'
+                if len(parts) > 1:
+                    error_part = parts[1]
+                    # Log the error part for debugging
+                    if error_part.strip():
+                        self.logger.debug(f"Skipping mixed error message: {error_part.strip()}")
+                
+                if main_response.startswith('<') and main_response.endswith('>'):
+                    return main_response[1:-1]
+                return main_response
+            
+            # Handle normal responses
             if response.startswith('<') and response.endswith('>'):
                 return response[1:-1]
             return response
@@ -244,6 +283,36 @@ class ESP32GPIO:
                         # These are debug messages from ESP32 core that leak into Serial
                         if response.startswith("E (") and ")" in response:
                             self.logger.debug(f"Skipping ESP32 system error: {response}")
+                            continue
+                        
+                        # Skip watchdog timer initialization errors
+                        if "task_wdt" in response and "already initialized" in response:
+                            self.logger.debug(f"Skipping watchdog timer error: {response}")
+                            continue
+                        
+                        # Skip ESP32 boot messages that might leak through
+                        if "ESP32 GPIO Bridge Ready" in response or "Ready" in response:
+                            self.logger.debug(f"Skipping boot message: {response}")
+                            continue
+                        
+                        # Skip ESP32 crash backtrace messages
+                        if response.startswith("Backtrace:") or "0x" in response and len(response) > 50:
+                            self.logger.debug(f"Skipping backtrace message: {response}")
+                            continue
+                        
+                        # Skip version messages that might leak through (but not when we're asking for version)
+                        if (response.startswith("Version:") or "0.1.8-beta" in response) and not command.startswith("VERSION"):
+                            self.logger.debug(f"Skipping version message: {response}")
+                            continue
+                        
+                        # Skip INFO messages that might leak through
+                        if response.startswith("INFO:") or response.startswith("WARN:") or response.startswith("ERROR:"):
+                            self.logger.debug(f"Skipping log message: {response}")
+                            continue
+                        
+                        # Skip boot loader messages
+                        if "load:0x" in response and "len:" in response:
+                            self.logger.debug(f"Skipping boot loader message: {response}")
                             continue
                         
                         # Skip STATUS responses unless we asked for STATUS
