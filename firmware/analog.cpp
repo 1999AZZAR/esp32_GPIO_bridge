@@ -14,7 +14,11 @@ extern bool outputCommandsSent;
 void initADC() {
     if (!adcInitialized) {
         adc1_config_width(ADC_WIDTH_BIT_12);
-        adc_chars = (esp_adc_cal_characteristics_t *)calloc(1, sizeof(esp_adc_cal_characteristics_t));
+        
+        // Use static allocation instead of malloc to prevent memory leaks
+        static esp_adc_cal_characteristics_t adc_chars_static;
+        adc_chars = &adc_chars_static;
+        
         esp_adc_cal_characterize(ADC_UNIT_1, ADC_ATTEN_DB_11, ADC_WIDTH_BIT_12, DEFAULT_VREF, adc_chars);
         adcInitialized = true;
     }

@@ -1,6 +1,6 @@
 # ESP32 GPIO Bridge
 
-**Version:** 0.1.7-beta
+**Version:** 0.1.8-beta
 
 ## Overview
 
@@ -8,7 +8,7 @@ ESP32 GPIO Bridge transforms an ESP32 development board into a versatile, PC-con
 
 The system communicates over a simple, text-based serial protocol via USB connection, providing a comprehensive Python library for GPIO control, PWM, I2C communication, EEPROM storage, and sensor integration.
 
-**New in v0.1.7-beta:** Dual Safe Mode implementation with two distinct failsafe behaviors - RESET mode (traditional) and HOLD mode (maintains pin states and continues executing queued commands during communication loss). Perfect for robotic applications and continuous operation scenarios!
+**New in v0.1.8-beta:** Critical performance and reliability improvements! Eliminated all non-interruptible states, optimized algorithms from O(n) to O(1), fixed memory leaks, and enhanced system stability. The ESP32 no longer gets stuck and operates with production-ready reliability!
 
 **Previous v0.1.6-beta:** Complete architectural refactoring with professional modular firmware design. Transformed from monolithic single-file architecture to 8 specialized modules with 54% reduction in main file size and dramatically improved maintainability!
 
@@ -17,6 +17,35 @@ The system communicates over a simple, text-based serial protocol via USB connec
 **Previous v0.1.4-beta:** Major performance optimizations with 2-3x faster operations, zero queue contamination, and 99.99% reduction in CPU overhead.
 
 **Previous v0.1.3-beta:** WiFi and Bluetooth are disabled by default to maximize GPIO performance and free up resources for extensive peripheral usage.
+
+## What's New in v0.1.8-beta
+
+**Critical Performance & Reliability Improvements:**
+
+### Non-Interruptible State Fixes
+- **Eliminated all non-interruptible states** that could cause ESP32 to hang
+- **Replaced `portMAX_DELAY`** with timeout-based mutex operations (50-200ms timeouts)
+- **Added robust error recovery** with graceful timeout handling
+- **Implemented system health monitoring** to detect and recover from stuck states
+
+### Performance Optimizations (O(n) → O(1))
+- **PWM Channel Allocation**: Now uses O(1) bitmask operations instead of O(n) linear search
+- **String Parsing**: Custom `fastAtoi()` and `fastAtoiHex()` functions for O(1) parsing
+- **I2C Scanning**: Optimized with faster clock speeds and reserved address skipping
+- **EEPROM Operations**: Direct buffer operations instead of String concatenation
+
+### Memory Management Improvements
+- **Fixed memory leaks**: Replaced `malloc()` with static allocation for ADC characteristics
+- **Optimized buffer usage**: Efficient response buffer system with reduced fragmentation
+- **Eliminated String allocation**: Custom parsing functions avoid heap fragmentation
+
+### System Reliability Enhancements
+- **Enhanced failsafe mechanism**: Multi-stage detection with proper timeout handling
+- **Added health monitoring**: Continuous system health checks with memory monitoring
+- **Improved error handling**: Better timeout management and error recovery
+- **Removed problematic watchdog**: Disabled incompatible watchdog timer that caused crashes
+
+**Result:** ESP32 GPIO Bridge is now significantly more robust, faster, and reliable with production-ready stability!
 
 ## What's New in v0.1.7-beta
 

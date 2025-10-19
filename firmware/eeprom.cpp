@@ -55,15 +55,17 @@ void handleEEPROMReadBlock(String addrStr, String lenStr) {
         return;
     }
     
-    String data = "";
+    // Optimized block read using response buffer
+    clearResponse();
+    addToResponse("<");
+    
     for (int i = 0; i < len; i++) {
-        if (i > 0) data += " ";
-        data += String(EEPROM.read(addr + i));
+        if (i > 0) addToResponse(" ");
+        addToResponse((int)EEPROM.read(addr + i));
     }
     
-    Serial.print("<");
-    Serial.print(data);
-    Serial.println(">");
+    addToResponse(">");
+    sendResponse();
 }
 
 void handleEEPROMWriteBlock(String parts[], int partCount) {
@@ -85,6 +87,7 @@ void handleEEPROMWriteBlock(String parts[], int partCount) {
         return;
     }
     
+    // Optimized block write with validation
     for (int i = 0; i < dataCount; i++) {
         int value = parts[i + 2].toInt();
         if (value < 0 || value > 255) {
@@ -92,6 +95,11 @@ void handleEEPROMWriteBlock(String parts[], int partCount) {
             return;
         }
         EEPROM.write(addr + i, (byte)value);
+        
+        // Yield control periodically for large blocks
+        if (i % 16 == 0) {
+            vTaskDelay(1 / portTICK_PERIOD_MS);
+        }
     }
     
     // OK response removed (v0.1.4 optimization)

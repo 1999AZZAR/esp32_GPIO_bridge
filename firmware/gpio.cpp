@@ -18,8 +18,11 @@ void trackPin(int pin) {
     if(isValidPin(pin)) configuredPins[pin] = true;
 }
 
+// Forward declaration for fast parsing functions
+extern int fastAtoi(const char* str);
+
 void handlePinMode(const char* pinStr, const char* modeStr) {
-    int pin = atoi(pinStr);
+    int pin = fastAtoi(pinStr);
     if (!isValidPin(pin)) { Serial.println("<ERROR:Invalid pin>"); return; }
     trackPin(pin);
     

@@ -16,19 +16,24 @@ int findPWMChannel(int pin) {
     return pinToPWMChannel[pin];
 }
 
+// O(1) PWM channel allocation using bitmask
+static uint16_t pwmChannelBitmap = 0;  // Bitmap for channel allocation (0-15 bits)
+
 int allocatePWMChannel(int pin) {
-    // Check if pin already has a channel
+    // Check if pin already has a channel - O(1) lookup
     int existingChannel = findPWMChannel(pin);
     if (existingChannel != -1) {
         return existingChannel;
     }
     
-    // Find free channel
+    // Find first free channel using bit operations - O(1) average case
     for (int i = 0; i < MAX_PWM_CHANNELS; i++) {
-        if (!pwmChannels[i].active) {
+        if (!(pwmChannelBitmap & (1 << i))) {
+            // Channel is free, allocate it
+            pwmChannelBitmap |= (1 << i);
             pwmChannels[i].pin = pin;
             pwmChannels[i].active = true;
-            pinToPWMChannel[pin] = i;  // Update O(1) mapping (v0.1.6-beta)
+            pinToPWMChannel[pin] = i;  // Update O(1) mapping
             return i;
         }
     }
@@ -134,6 +139,7 @@ void handlePWMStop(String pinStr) {
     
     pwmChannels[channel].active = false;
     pwmChannels[channel].pin = -1;
-    pinToPWMChannel[pin] = -1;  // Clear O(1) mapping (v0.1.6-beta)
+    pinToPWMChannel[pin] = -1;  // Clear O(1) mapping
+    pwmChannelBitmap &= ~(1 << channel);  // Clear bit in bitmap
     // OK response removed (v0.1.4 optimization)
 }

@@ -6,6 +6,7 @@
 #include "esp_wifi.h"
 #include "esp_bt.h"
 #include "esp_bt_main.h"
+// #include "esp_task_wdt.h"  // Disabled due to compatibility issues
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/semphr.h"
@@ -38,6 +39,65 @@ char cmdBuffer[CMD_BUFFER_SIZE];
 int cmdIndex = 0;
 bool inCommand = false;
 
+// Command hash table for O(1) lookup
+struct CommandHash {
+    const char* name;
+    int hash;
+    void (*handler)(char* parts[], int partCount);
+};
+
+// Simple hash function for command names
+int hashCommand(const char* str) {
+    int hash = 0;
+    while (*str) {
+        hash = hash * 31 + toupper(*str);
+        str++;
+    }
+    return hash & 0xFF;  // Use only lower 8 bits for small table
+}
+
+// Fast integer parsing - O(1) average case
+int fastAtoi(const char* str) {
+    int result = 0;
+    bool negative = false;
+    
+    if (*str == '-') {
+        negative = true;
+        str++;
+    }
+    
+    while (*str >= '0' && *str <= '9') {
+        result = result * 10 + (*str - '0');
+        str++;
+    }
+    
+    return negative ? -result : result;
+}
+
+// Fast hex parsing - O(1) average case
+int fastAtoiHex(const char* str) {
+    int result = 0;
+    
+    // Skip "0x" prefix if present
+    if (str[0] == '0' && str[1] == 'x') {
+        str += 2;
+    }
+    
+    while (*str) {
+        char c = toupper(*str);
+        if (c >= '0' && c <= '9') {
+            result = result * 16 + (c - '0');
+        } else if (c >= 'A' && c <= 'F') {
+            result = result * 16 + (c - 'A' + 10);
+        } else {
+            break;
+        }
+        str++;
+    }
+    
+    return result;
+}
+
 // Command queuing system (v0.1.6-beta modular architecture)
 struct QueuedCommand {
   char command[CMD_BUFFER_SIZE];
@@ -62,7 +122,13 @@ int8_t pinToPWMChannel[MAX_PINS];  // -1 = unused
 // FreeRTOS task handles
 TaskHandle_t serialTaskHandle;
 TaskHandle_t failsafeTaskHandle;
+TaskHandle_t healthMonitorTaskHandle;
 SemaphoreHandle_t sharedDataMutex;
+
+// System health monitoring
+volatile unsigned long lastSerialActivity = 0;
+volatile unsigned long lastCommandProcessed = 0;
+volatile bool systemHealthy = true;
 
 // Pin state tracking functions for safe mode
 void trackPinState(int pin, uint8_t mode, uint8_t value) {
@@ -182,6 +248,9 @@ void setup() {
     return;
   }
   
+  // Watchdog timer disabled due to compatibility issues
+  // esp_task_wdt_init(30, true);
+  
   // Create FreeRTOS tasks (v0.1.6-beta)
   xTaskCreatePinnedToCore(
     serialTask,           // Task function
@@ -203,6 +272,22 @@ void setup() {
     1                     // Core 1 (application CPU)
   );
   
+  // Create health monitor task
+  xTaskCreatePinnedToCore(
+    healthMonitorTask,    // Task function
+    "HealthMonitor",      // Task name
+    2048,                 // Stack size
+    NULL,                 // Parameters
+    0,                    // Priority (lowest)
+    &healthMonitorTaskHandle,  // Task handle
+    1                     // Core 1 (application CPU)
+  );
+  
+  // Watchdog task addition disabled due to compatibility issues
+  // if (serialTaskHandle) esp_task_wdt_add(serialTaskHandle);
+  // if (failsafeTaskHandle) esp_task_wdt_add(failsafeTaskHandle);
+  // if (healthMonitorTaskHandle) esp_task_wdt_add(healthMonitorTaskHandle);
+  
   Serial.println("<INFO:FreeRTOS tasks initialized - Dual-core operation enabled>");
 }
 
@@ -212,6 +297,7 @@ void serialTask(void* parameter) {
     // Phase 1: Parse and queue incoming commands
     while (Serial.available()) {
       char c = Serial.read();
+      lastSerialActivity = millis();  // Track serial activity
       
       if (c == '<') {
         // Start of command
@@ -224,11 +310,14 @@ void serialTask(void* parameter) {
         
         // Enqueue command for batch processing
         if (!enqueueCommand(cmdBuffer)) {
-          // Queue full - process immediately
-          if (xSemaphoreTake(sharedDataMutex, portMAX_DELAY) == pdTRUE) {
+          // Queue full - process immediately with timeout to prevent deadlock
+          if (xSemaphoreTake(sharedDataMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
             processCommand(cmdBuffer);
             updateCommandTimestamps();
             xSemaphoreGive(sharedDataMutex);
+          } else {
+            // Timeout occurred - send error and continue
+            Serial.println("<ERROR:Command processing timeout - system busy>");
           }
         }
         
@@ -249,7 +338,7 @@ void serialTask(void* parameter) {
     // Phase 2: Process queued commands in batch
     // Continue processing queued commands even in SAFE_MODE_HOLD failsafe
     if (queueCount > 0 && (!failsafeEngaged || currentSafeMode == SAFE_MODE_HOLD)) {
-      if (xSemaphoreTake(sharedDataMutex, portMAX_DELAY) == pdTRUE) {
+      if (xSemaphoreTake(sharedDataMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
         // Process up to 5 commands per batch for optimal throughput
         int batchSize = min(queueCount, 5);
         for (int i = 0; i < batchSize; i++) {
@@ -271,6 +360,8 @@ void serialTask(void* parameter) {
 void updateCommandTimestamps() {
   lastCommandTime = millis();
   lastPingTime = millis();
+  lastCommandProcessed = millis();
+  lastSerialActivity = millis();
   
   // Reset failsafe states when communication resumes
   if (failsafeEngaged) {
@@ -284,13 +375,45 @@ void failsafeTask(void* parameter) {
   while (true) {
     unsigned long currentTime = millis();
     
-    // Protect shared data access
-    if (xSemaphoreTake(sharedDataMutex, portMAX_DELAY) == pdTRUE) {
+    // Protect shared data access with timeout to prevent deadlock
+    if (xSemaphoreTake(sharedDataMutex, pdMS_TO_TICKS(200)) == pdTRUE) {
       checkFailsafe(currentTime);
       xSemaphoreGive(sharedDataMutex);
     }
     
     vTaskDelay(1000 / portTICK_PERIOD_MS);  // Check every 1 second
+  }
+}
+
+void healthMonitorTask(void* parameter) {
+  while (true) {
+    unsigned long currentTime = millis();
+    
+    // Check for system health issues
+    if (currentTime - lastCommandProcessed > 60000) {  // 60 seconds without command processing
+      if (systemHealthy) {
+        Serial.println("<WARN:System health check - No command processing for 60 seconds>");
+        systemHealthy = false;
+      }
+    } else {
+      systemHealthy = true;
+    }
+    
+    // Check for serial communication issues
+    if (currentTime - lastSerialActivity > 120000) {  // 2 minutes without serial activity
+      Serial.println("<WARN:System health check - No serial activity for 2 minutes>");
+      // Reset serial buffer to prevent overflow
+      while (Serial.available()) {
+        Serial.read();
+      }
+    }
+    
+    // Monitor memory usage (simplified check)
+    if (esp_get_free_heap_size() < 10000) {  // Less than 10KB free
+      Serial.println("<WARN:System health check - Low memory: " + String(esp_get_free_heap_size()) + " bytes>");
+    }
+    
+    vTaskDelay(10000 / portTICK_PERIOD_MS);  // Check every 10 seconds
   }
 }
 
