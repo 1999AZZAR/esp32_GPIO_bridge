@@ -117,7 +117,7 @@ def test_eeprom_string_operations(esp):
         esp.eeprom_commit()
         
         # Read string
-        read_string = esp.eeprom_read_string(0)
+        read_string = esp.eeprom_read_string(0, len(test_string))
         
         success = test_string == read_string
         print_test_result("String write/read", success,

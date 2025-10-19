@@ -280,8 +280,8 @@ class ESP32GPIO:
                         timeout = 1.5 if attempt < 3 else 0.3
                         response = self.get_response(timeout=timeout)
                         
-                        # Skip PONG responses from ping thread
-                        if response == "PONG":
+                        # Skip PONG responses from ping thread unless we're sending PING command
+                        if response == "PONG" and command != "PING":
                             continue
                         
                         # Skip OK responses from write commands (firmware sends these even though we don't expect them)
@@ -443,13 +443,8 @@ class ESP32GPIO:
         if not self.is_connected():
             return "ESP32 GPIO Bridge (Not connected)"
 
-        try:
-            with self.lock:
-                response = self._send_command("IDENTITY", expect_response=True)
-                return response if response else "ESP32 GPIO Bridge"
-                
-        except Exception as e:
-            return f"ESP32 GPIO Bridge (Error: {e})"
+        # Return static identity since firmware doesn't support IDENTITY command
+        return "ESP32 GPIO Bridge"
 
     def ping(self) -> str:
         """
